@@ -35,7 +35,11 @@
     }
   },
 
-  "postCreateCommand": ".devcontainer/setup.sh",
+  "postCreateCommand": {
+    "go-tools": "go install github.com/air-verse/air@latest && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest",
+    "go-deps": "cd /workspace && go mod download",
+    "wait-db": "until pg_isready -h db -U clicktrainer; do sleep 1; done"
+  },
 
   "remoteEnv": {
     "DATABASE_URL": "postgres://clicktrainer:clicktrainer@db:5432/clicktrainer?sslmode=disable",

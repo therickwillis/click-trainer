@@ -21,7 +21,8 @@
       "Bash(test:*)",
       "Bash(chmod:*)",
       "Bash(\"C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe\" build ./...)",
-      "Bash(\"C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe\" test ./...)"
+      "Bash(\"C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe\" test ./...)",
+      "Bash(docker compose:*)"
     ]
   }
 }
