@@ -1,0 +1,205 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: url('/static/background.svg');
+  background-size: cover;
+  font-family: 'Verdana', cursive;
+}
+
+#game-area {
+  position: relative;
+  width: 600px;
+  height: 400px;
+}
+
+h1 {
+  font-size: 5rem;
+  font-weight: bolder;
+  text-shadow: 0 0.3rem 0 rgba(0,0,0,0.3);
+  -webkit-text-stroke: 0.1rem rgba(0,0,0,0.3);
+}
+
+h1.join {
+  color: whitesmoke;
+  text-align: center;
+}
+
+input[type="text"]{
+  padding:0.5rem;
+  border-radius: 0.5rem;
+  border:0.1rem solid whitesmoke;
+  box-shadow: 0 0 0.5rem whitesmoke;
+  margin: 3rem 0;
+  text-align: center;
+  font-size: 1.2rem;
+  color: white;
+  max-width: 16rem;
+}
+input[type="text"]:focus {
+  outline-color: white;
+}
+
+
+button[type=submit] {
+  background-color:#4ac91c;
+  padding:0.5rem 2rem;
+  font-size: 2rem;
+  border-radius: 1.2rem;
+  outline: 0.2rem solid #165e53;
+  border: 0.3rem solid #82e027;
+  text-transform: uppercase;
+  color:white;
+  font-weight: 900;
+  text-shadow: 0 0.2rem #165e5333;  
+  cursor:pointer;
+  box-shadow: 0 0.7rem #165e5355;
+  transition: all 0.1s linear;
+  max-width: 16rem;
+}
+button[type=submit]:hover,
+button[type=submit]:focus{
+  background-color: #82e027;
+  outline-color: #52bb29
+}
+
+/* Animation for when the target is added */
+.target {
+  pointer-events: none;
+  /* Run an enter animation on load */
+  animation: targetEnter 0.3s ease-in;
+
+  circle {
+    pointer-events: visible;
+  }
+}
+
+@keyframes targetEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Class for triggering exit animation */
+.fade-out {
+  animation: targetExit 0.3s ease-in forwards;
+}
+
+@keyframes targetExit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+
+/* defaults */
+:root {
+  --gradient-start: #434343;
+  --gradient-end: #000000;
+  --gradient-start-old: #434343;
+  --gradient-end-old: #000000;  
+  --gradient-opacity: 0.8;
+}
+
+body[data-scene="lobby"] {
+  --gradient-start: #754ce5;
+  --gradient-end: #3ac9e8;
+}
+
+body[data-scene="combat"] {
+  --gradient-start: #2a48b7;
+  --gradient-end: #3f99d2;
+}
+
+body[data-scene="join"] {
+  --gradient-start: #f7c2cb;
+  --gradient-end: #b173f8;
+}
+
+body[data-scene="recap"] {
+  --gradient-start: #a18cd1;
+  --gradient-end: #fbc2eb;
+}
+
+.gradient-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--gradient-start), var(--gradient-end));
+  opacity: var(--gradient-opacity);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index:1;
+}
+
+#scene>*:not(.gradient-overlay) {
+  position: relative;
+  z-index: 10;
+}
+
+
+form {
+  position:absolute;
+  inset:0;
+  z-index: 10;
+}
+
+/* Container for the parallax effect */
+.parallax-container {
+  position: fixed; /* Establishes positioning context for absolute children */      
+  inset:0;
+  overflow: hidden; /* Hides overflowing parts during animation */  
+  height: 100vh; /* Or a fixed height */
+  width: 100%;
+  z-index: 0;
+  /* For auto-moving, perspective and overflow-y: auto (used in scroll-based parallax [7, 9, 11]) are typically NOT on the container. */
+}
+
+/* Base styles for all parallax layers */
+.parallax-layer {
+  position: absolute; /* Position layers relative to the container */
+  top: 0;  
+  left: 0;
+  right:0;
+  bottom:0;  
+  white-space: nowrap;    
+  display:flex;
+  flex-direction: row;
+}
+
+/* Specific styles and animation for the first cloud layer (middle speed) */
+.cloud-1 {  
+  animation: scrollClouds linear infinite; /* Apply the animation */
+  animation-duration: 120s; /* Medium duration */  
+}
+
+/* Specific styles and animation for the second cloud layer (closest, fastest) */
+.cloud-2 {  
+  animation: scrollClouds linear infinite; /* Apply the animation */
+  animation-duration: 240s; /* Shorter duration for faster speed */  
+}
+
+.parallax-layer img {
+  height: 70vh;
+  width: 100%;
+  opacity: 0.7;
+}
+
+/* Keyframes for the second cloud animation */
+@keyframes scrollClouds {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-100%); }
+}

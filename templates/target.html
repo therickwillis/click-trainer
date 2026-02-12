@@ -1,0 +1,19 @@
+{{define "target"}}
+<div id="target_{{ .ID }}">
+    <svg viewBox="0 0 150 150" class="target" style="
+        position:absolute;
+        left: {{ .X }}px;
+        top: {{ .Y }}px;
+        width: {{ .Size }}px;
+        height: {{ .Size }}px;">        
+        <circle hx-trigger="mousedown" hx-post="/target/{{.ID}}/1" hx-swap="none" cx="75" cy="75" r="70"
+            fill="{{.Color}}" />        
+        <circle hx-trigger="mousedown" hx-post="/target/{{.ID}}/2" hx-swap="none" cx="75" cy="75" r="50"
+            fill="#fcfdef" />        
+        <circle hx-trigger="mousedown" hx-post="/target/{{.ID}}/3" hx-swap="none" cx="75" cy="75" r="30"
+            fill="{{.Color}}" />        
+        <circle hx-trigger="mousedown" hx-post="/target/{{.ID}}/4" hx-swap="none" cx="75" cy="75" r="10"
+            fill="#fcfdef" />
+    </svg>
+</div>
+{{end}}
