@@ -1,0 +1,46 @@
+{
+  "name": "Click Trainer",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.24"
+    }
+  },
+
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": { "label": "Click Trainer", "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "otovo-oss.htmx-tags",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": ["--fast"],
+        "go.testFlags": ["-v"],
+        "editor.formatOnSave": true,
+        "[go]": {
+          "editor.defaultFormatter": "golang.go"
+        }
+      }
+    }
+  },
+
+  "postCreateCommand": ".devcontainer/setup.sh",
+
+  "remoteEnv": {
+    "DATABASE_URL": "postgres://clicktrainer:clicktrainer@db:5432/clicktrainer?sslmode=disable",
+    "TEST_DATABASE_URL": "postgres://clicktrainer:clicktrainer@db:5432/clicktrainer_test?sslmode=disable",
+    "PORT": "8080",
+    "ROUND_DURATION": "60"
+  }
+}

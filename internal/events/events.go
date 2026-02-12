@@ -4,4 +4,12 @@ type SceneChangeEvent struct {
 	Scene string
 }
 
-var SceneChanges = make(chan SceneChangeEvent, 10)
+type Bus struct {
+	SceneChanges chan SceneChangeEvent
+}
+
+func NewBus() *Bus {
+	return &Bus{
+		SceneChanges: make(chan SceneChangeEvent, 10),
+	}
+}

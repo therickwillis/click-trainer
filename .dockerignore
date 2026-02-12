@@ -1,0 +1,6 @@
+.git
+.air.toml
+tmp/
+*.md
+design.svg
+.golangci.yml

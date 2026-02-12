@@ -1,0 +1,18 @@
+{{define "recap"}}
+<div id="recap" class="w-md text-center">
+    <h1 class="text-white mb-4">Game Over!</h1>
+    <div class="flex flex-col gap-2 mb-6">
+        {{range $i, $p := .}}
+        <div class="flex flex-row bg-white rounded-lg p-2 items-center">
+            <div class="text-lg font-bold w-8">{{inc $i}}</div>
+            <div class="grow text-left" style="color:{{$p.Color}}">{{$p.Name}}</div>
+            <div class="text-lg font-bold">{{$p.Score}} pts</div>
+        </div>
+        {{end}}
+    </div>
+    <button hx-post="/room/play-again" hx-swap="none"
+        class="bg-blue-700 hover:bg-blue-600 p-4 border-1 cursor-pointer rounded-lg text-white focus:ring-blue-400">
+        Play Again
+    </button>
+</div>
+{{end}}

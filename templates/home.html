@@ -1,0 +1,54 @@
+{{define "home"}}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Click Trainer</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body data-scene="join" class="bg-gray-200">
+    <div class="absolute inset-0 z-10 flex flex-row h-screen">
+        <div class="flex-1"></div>
+        <div class="flex-1 content-center">
+            <div class="flex flex-col justify-center items-center gap-6">
+                <h1 class="join">CLICK<br>TRAINER</h1>
+
+                <form method="post" action="/rooms/create">
+                    <button type="submit" class="join">Create Room</button>
+                </form>
+
+                <div class="text-white text-center text-lg font-bold">— or —</div>
+
+                <form method="post" action="/rooms/join" class="flex flex-col items-center gap-3" style="position:static; inset:auto;">
+                    <input name="code" type="text" required placeholder="ROOM CODE" maxlength="4"
+                        style="text-transform:uppercase; letter-spacing:0.3em;" />
+                    <button type="submit" class="join" style="font-size:1.2rem; padding:0.4rem 1.5rem;">Join Room</button>
+                </form>
+
+                {{if .}}{{if .Error}}
+                <div class="bg-red-500 text-white p-2 rounded-lg text-sm">{{.Error}}</div>
+                {{end}}{{end}}
+            </div>
+        </div>
+        <div class="flex-1"></div>
+    </div>
+
+    <div class="gradient-overlay"></div>
+    <div class="parallax-container">
+        <div class="parallax-layer stars"></div>
+        <div class="parallax-layer cloud-1">
+            <img src="/static/cloud-1.svg" />
+            <img src="/static/cloud-1.svg" />
+        </div>
+        <div class="parallax-layer cloud-2">
+            <img src="/static/cloud-2.svg" />
+            <img src="/static/cloud-2.svg" />
+        </div>
+    </div>
+</body>
+
+</html>
+{{end}}

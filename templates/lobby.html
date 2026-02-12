@@ -1,7 +1,10 @@
 
 {{define "lobby"}}
 <div id="lobby" class="w-md">
-    <h1>Lobby</h1>    
+    <h1>Lobby</h1>
+    {{if .RoomCode}}
+    <div class="text-white text-lg font-bold mb-4 text-center">Room: {{.RoomCode}} — share with friends!</div>
+    {{end}}
     <div id="lobby_players" class="w-md">
         {{range .Players}}
             {{template "lobbyPlayer" .}}
@@ -10,7 +13,7 @@
     </div>
     <div class="mb-20">
         <input id="ready_input" type="hidden" name="ready" value="{{if eq .Player.Ready true}}wait{{else}}ready{{end}}"/>
-        <button id="ready_button" type="submit" hx-post="/ready" hx-include="[name='ready']" hx-swap="none" class="bg-blue-700 hover:bg-blue-600 p-4 border-1 cursor-pointer rounded-lg text-white focus:ring-blue-400">
+        <button id="ready_button" type="submit" hx-post="/room/ready" hx-include="[name='ready']" hx-swap="none" class="bg-blue-700 hover:bg-blue-600 p-4 border-1 cursor-pointer rounded-lg text-white focus:ring-blue-400">
             {{if eq .Player.Ready true}}Wait! Hold on a sec!{{else}}I'm Ready!{{end}}
         </button>
     </div>

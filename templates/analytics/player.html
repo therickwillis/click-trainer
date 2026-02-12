@@ -1,0 +1,55 @@
+{{define "analytics-player"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Click Trainer - Player Profile</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+<body data-scene="recap" class="overflow-auto">
+    <div class="gradient-overlay"></div>
+    <div class="relative z-10 p-8 max-w-4xl mx-auto">
+        <a href="/analytics" class="text-white underline mb-6 inline-block">&larr; Back to Analytics</a>
+
+        <div class="bg-white rounded-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold mb-2" style="color:{{.PlayerColor}}">{{.PlayerName}}</h1>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mt-4">
+                <div>
+                    <div class="text-3xl font-bold">{{.GamesPlayed}}</div>
+                    <div class="text-gray-500">Games</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold">{{.TotalScore}}</div>
+                    <div class="text-gray-500">Total Score</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold">{{.WinCount}}</div>
+                    <div class="text-gray-500">Wins</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold">{{.BestGame}}</div>
+                    <div class="text-gray-500">Best Game</div>
+                </div>
+            </div>
+        </div>
+
+        {{if .Badges}}
+        <div class="bg-white rounded-lg p-6">
+            <h2 class="text-2xl font-bold mb-4">Badges</h2>
+            <div class="flex flex-wrap gap-3">
+                {{range .Badges}}
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                    <div class="text-2xl">{{.Icon}}</div>
+                    <div class="font-bold text-sm">{{.Name}}</div>
+                    <div class="text-xs text-gray-500">{{.Description}}</div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+</body>
+</html>
+{{end}}

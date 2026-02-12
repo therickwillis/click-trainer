@@ -1,57 +1,79 @@
 package targets
 
 import (
-	utility "clicktrainer/internal"
+	"clicktrainer/internal/utility"
 	"math/rand"
 	"sync"
-)
-
-var (
-	targets   = make(map[int]*Target)
-	nextID    = 1
-	targetsMu sync.Mutex
+	"time"
 )
 
 const (
-	gameHeight    = 400
-	gameWidth     = 600
-	minTargetSize = 50
-	maxTargetSize = 100
+	GameHeight    = 400
+	GameWidth     = 600
+	MinTargetSize = 50
+	MaxTargetSize = 100
 )
 
-func Add() *Target {
-	targetsMu.Lock()
-	id := nextID
-	nextID++
-	targetSize := rand.Intn(maxTargetSize-minTargetSize) + minTargetSize
-	target := &Target{
-		ID:    id,
-		X:     rand.Intn(gameWidth - targetSize),
-		Y:     rand.Intn(gameHeight - targetSize),
-		Color: utility.RandomColorHex(),
-		Size:  targetSize,
+type Store struct {
+	mu      sync.Mutex
+	targets map[int]*Target
+	nextID  int
+}
+
+func NewStore() *Store {
+	return &Store{
+		targets: make(map[int]*Target),
+		nextID:  1,
 	}
-	targets[id] = target
-	targetsMu.Unlock()
+}
+
+func (s *Store) Add() *Target {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id := s.nextID
+	s.nextID++
+	targetSize := rand.Intn(MaxTargetSize-MinTargetSize) + MinTargetSize
+	target := &Target{
+		ID:        id,
+		X:         rand.Intn(GameWidth - targetSize),
+		Y:         rand.Intn(GameHeight - targetSize),
+		Color:     utility.RandomColorHex(),
+		Size:      targetSize,
+		SpawnedAt: time.Now(),
+	}
+	s.targets[id] = target
 	return target
 }
 
-func Kill(id int) {
-	targetsMu.Lock()
-	if t, e := targets[id]; e {
-		t.Dead = true
-	}
-	targetsMu.Unlock()
+func (s *Store) Get(id int) *Target {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.targets[id]
 }
 
-func GetList() []*Target {
-	targetsMu.Lock()
-	targetList := make([]*Target, 0, len(targets))
-	for _, t := range targets {
+func (s *Store) Kill(id int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if t, e := s.targets[id]; e {
+		t.Dead = true
+	}
+}
+
+func (s *Store) GetList() []*Target {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	targetList := make([]*Target, 0, len(s.targets))
+	for _, t := range s.targets {
 		if !t.Dead {
 			targetList = append(targetList, t)
 		}
 	}
-	targetsMu.Unlock()
 	return targetList
+}
+
+func (s *Store) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.targets = make(map[int]*Target)
+	s.nextID = 1
 }

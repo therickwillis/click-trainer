@@ -10,12 +10,15 @@
 </head>
 
 <body data-scene="join" class="bg-gray-200">
-    <form method="post" action="/register">
+    <form method="post" action="/room/register">
         <div id="join" class="flex flex-row h-screen">
             <div class="flex-1"></div>
             <div class="flex-1 content-center">
                 <div class="flex flex-col justify-center items-center">
-                    <h1 class="join">JOIN</h1>                
+                    <h1 class="join">JOIN</h1>
+                    {{if .}}{{if .RoomCode}}
+                    <div class="text-white text-lg font-bold mb-2">Room: {{.RoomCode}}</div>
+                    {{end}}{{end}}
                     <div>
                         <input name="name" type="text" required placeholder="Your Name Here..." />
                     </div>
@@ -25,16 +28,16 @@
                 </div>
             </div>
             <div class="flex-1"></div>
-        </div>        
+        </div>
     </form>
 
     <div class="gradient-overlay"></div>
     <div class="parallax-container">
         <div class="parallax-layer stars">
-        </div>        
-        <div class="parallax-layer cloud-1">            
+        </div>
+        <div class="parallax-layer cloud-1">
             <img src="/static/cloud-1.svg" />
-            <img src="/static/cloud-1.svg" />                                   
+            <img src="/static/cloud-1.svg" />
         </div>
         <div class="parallax-layer cloud-2">
             <img src="/static/cloud-2.svg" />

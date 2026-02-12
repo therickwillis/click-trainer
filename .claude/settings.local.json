@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(go build:*)",
+      "Bash(where:*)",
+      "Bash(cmd:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Go/bin:/c/Users/theri/go/bin\")",
+      "Bash(go version:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(/c/Program Files/Go/bin/go.exe build:*)",
+      "Bash(/c/Program Files/Go/bin/go.exe test:*)",
+      "Bash(/c/Program Files/Go/bin/go.exe vet:*)",
+      "Bash(\"/c/Program Files/Go/bin/go.exe\" build ./cmd/web)",
+      "Bash(\"/c/Program Files/Go/bin/go.exe\" test ./...)",
+      "Bash(\"/c/Program Files/Go/bin/go.exe\" build ./...)",
+      "Bash(\"/c/Program Files/Go/bin/go.exe\" vet ./...)",
+      "Bash(\"/c/Program Files/Go/bin/go.exe\" get github.com/lib/pq)",
+      "Bash(\"/c/Program Files/Go/bin/go.exe\" test -v -count=1 ./...)",
+      "Bash(ls -la \"F:\\\\repos\\\\click-trainer\\\\static\"\" 2>nul || echo \"static directory not found \")",
+      "Bash(test:*)",
+      "Bash(chmod:*)",
+      "Bash(\"C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe\" build ./...)",
+      "Bash(\"C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe\" test ./...)"
+    ]
+  }
+}

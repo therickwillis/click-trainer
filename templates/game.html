@@ -12,12 +12,14 @@
     <link rel="icon" href="/static/favicon.ico">
 </head>
 
-<body hx-ext="sse"sse-connect="/events" data-scene="{{.Scene}}">
-    <div class="p-4 h-screen relative">        
+<body hx-ext="sse" sse-connect="/room/events" data-scene="{{.Scene}}">
+    <div class="p-4 h-screen relative">
         <div id="scene"
             class="h-full flex flex-col justify-center items-center md:scale-130 lg:scale-160 xl:scale-180 2xl:scale-200 3xl:scale-230 4xl:scale-260">
             {{if eq .Scene "lobby"}}
             {{template "lobby" .}}
+            {{else if eq .Scene "recap"}}
+            {{template "recap" .Rankings}}
             {{else}}
             {{template "gameContent" .}}
             {{end}}
@@ -26,7 +28,7 @@
     </div>
     <div sse-swap="swap" hx-swap="true"></div>
     <div sse-swap="sceneChange" style="display:none;" hx-on:htmx:after-swap="document.body.setAttribute('data-scene', this.textContent)"></div>
-    <div id="game-content-conn" hx-trigger="sse:update" hx-get="/poll" hx-target="#game-content" hx-swap="innerHTML">
+    <div id="game-content-conn" hx-trigger="sse:update" hx-get="/room/poll" hx-target="#game-content" hx-swap="innerHTML">
     </div>
 </body>
 
@@ -35,8 +37,11 @@
 
 {{define "gameContent"}}
 
-    <div id="scoreboard" class="flex flex-row">
-        {{template "scoreboard" .Players}}
+    <div class="flex flex-row items-center gap-4 w-full justify-center">
+        <div id="scoreboard" class="flex flex-row">
+            {{template "scoreboard" .Players}}
+        </div>
+        <div id="timer" class="bg-white rounded-lg p-1 px-2 text-sm font-bold">{{.TimeLeft}}</div>
     </div>
     <div id="game-area" class="relative">
         <div id="targets">

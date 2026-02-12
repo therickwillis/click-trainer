@@ -1,0 +1,72 @@
+{{define "analytics-dashboard"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Click Trainer - Analytics</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+<body data-scene="recap" class="overflow-auto">
+    <div class="gradient-overlay"></div>
+    <div class="relative z-10 p-8 max-w-4xl mx-auto">
+        <h1 class="text-white text-4xl font-bold mb-8">Analytics</h1>
+
+        <a href="/" class="text-white underline mb-6 inline-block">&larr; Back to Home</a>
+
+        {{if .PlayerStats}}
+        <div class="bg-white rounded-lg p-6 mb-8">
+            <h2 class="text-2xl font-bold mb-4">Your Stats</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                    <div class="text-3xl font-bold">{{.PlayerStats.GamesPlayed}}</div>
+                    <div class="text-gray-500">Games</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold">{{.PlayerStats.TotalScore}}</div>
+                    <div class="text-gray-500">Total Score</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold">{{.PlayerStats.WinCount}}</div>
+                    <div class="text-gray-500">Wins</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold">{{.PlayerStats.BestGame}}</div>
+                    <div class="text-gray-500">Best Game</div>
+                </div>
+            </div>
+            {{if .PlayerStats.Badges}}
+            <div class="mt-4">
+                <h3 class="font-bold mb-2">Badges</h3>
+                <div class="flex flex-wrap gap-2">
+                    {{range .PlayerStats.Badges}}
+                    <span class="bg-yellow-100 rounded-lg px-3 py-1 text-sm" title="{{.Description}}">{{.Icon}} {{.Name}}</span>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+
+        <div class="bg-white rounded-lg p-6">
+            <h2 class="text-2xl font-bold mb-4">Leaderboard</h2>
+            <div class="flex gap-2 mb-4">
+                <button hx-get="/analytics/leaderboard?cat=score" hx-target="#leaderboard-content" hx-swap="innerHTML"
+                    class="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600">Score</button>
+                <button hx-get="/analytics/leaderboard?cat=wins" hx-target="#leaderboard-content" hx-swap="innerHTML"
+                    class="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600">Wins</button>
+                <button hx-get="/analytics/leaderboard?cat=reaction" hx-target="#leaderboard-content" hx-swap="innerHTML"
+                    class="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600">Reaction</button>
+                <button hx-get="/analytics/leaderboard?cat=bullseyes" hx-target="#leaderboard-content" hx-swap="innerHTML"
+                    class="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600">Bullseyes</button>
+            </div>
+            <div id="leaderboard-content">
+                {{template "leaderboard-entries" .Leaderboard}}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+{{end}}

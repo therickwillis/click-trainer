@@ -1,0 +1,54 @@
+{{define "analytics-game"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Click Trainer - Game Recap</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+<body data-scene="recap" class="overflow-auto">
+    <div class="gradient-overlay"></div>
+    <div class="relative z-10 p-8 max-w-4xl mx-auto">
+        <a href="/analytics" class="text-white underline mb-6 inline-block">&larr; Back to Analytics</a>
+
+        <div class="bg-white rounded-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold mb-2">Game Recap</h1>
+            <div class="text-gray-500 mb-4">Room: {{.RoomCode}}</div>
+        </div>
+
+        {{range .Players}}
+        <div class="bg-white rounded-lg p-4 mb-4">
+            <div class="flex items-center gap-4 mb-3">
+                <span class="text-lg font-bold" style="color:{{.PlayerColor}}">{{.PlayerName}}</span>
+                <span class="text-lg font-bold">{{.Score}} pts</span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-center text-sm">
+                <div>
+                    <div class="font-bold">{{.Clicks}}</div>
+                    <div class="text-gray-500">Clicks</div>
+                </div>
+                <div>
+                    <div class="font-bold">{{printf "%.0f" .AvgReaction}}ms</div>
+                    <div class="text-gray-500">Avg Reaction</div>
+                </div>
+                <div>
+                    <div class="font-bold">{{.BestReaction}}ms</div>
+                    <div class="text-gray-500">Best Reaction</div>
+                </div>
+                <div>
+                    <div class="font-bold">{{printf "%.1f" .CPS}}</div>
+                    <div class="text-gray-500">CPS</div>
+                </div>
+                <div>
+                    <div class="font-bold">{{printf "%.0f" .BullseyeRate}}%</div>
+                    <div class="text-gray-500">Bullseye Rate</div>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</body>
+</html>
+{{end}}
