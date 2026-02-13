@@ -1,11 +1,11 @@
 
 {{define "lobby"}}
 <div id="lobby" class="w-md">
-    <h1>Lobby</h1>
+    <h1 class="text-white">Lobby</h1>
     {{if .RoomCode}}
-    <div class="text-white text-lg font-bold mb-4 text-center">Room: {{.RoomCode}} — share with friends!</div>
+    <div class="text-white text-lg font-bold mb-4 text-center">Room: <span class="text-2xl tracking-widest bg-white/20 px-3 py-1 rounded-lg">{{.RoomCode}}</span> — share with friends!</div>
     {{end}}
-    <div id="lobby_players" class="w-md">
+    <div id="lobby_players" class="w-md flex flex-col gap-2 mb-4">
         {{range .Players}}
             {{template "lobbyPlayer" .}}
         {{end}}
@@ -13,7 +13,7 @@
     </div>
     <div class="mb-20">
         <input id="ready_input" type="hidden" name="ready" value="{{if eq .Player.Ready true}}wait{{else}}ready{{end}}"/>
-        <button id="ready_button" type="submit" hx-post="/room/ready" hx-include="[name='ready']" hx-swap="none" class="bg-blue-700 hover:bg-blue-600 p-4 border-1 cursor-pointer rounded-lg text-white focus:ring-blue-400">
+        <button id="ready_button" type="submit" hx-post="/room/ready" hx-include="[name='ready']" hx-swap="none">
             {{if eq .Player.Ready true}}Wait! Hold on a sec!{{else}}I'm Ready!{{end}}
         </button>
     </div>
@@ -21,14 +21,16 @@
 {{end}}
 
 {{define "lobbyPlayer"}}
-<div id="lobby_player{{.ID}}" class="flex flex-row bg-white rounded-lg w-full">
-    <div class="grow">{{.Name}}</div>
-    <div id="lobby_player_ready{{.ID}}" class="grow">{{if eq .Ready true}}Let's Go!{{else}}waiting for player{{end}}</div>
+<div id="lobby_player{{.ID}}" class="flex flex-row items-center gap-3 bg-white/20 backdrop-blur-sm rounded-lg px-4 py-3 text-white w-full">
+    <div class="w-4 h-4 rounded-full" style="background-color:{{.Color}}"></div>
+    <div class="grow font-bold">{{.Name}}</div>
+    <div id="lobby_player_ready{{.ID}}" class="text-sm italic opacity-80">{{if eq .Ready true}}Let's Go!{{else}}waiting for player{{end}}</div>
 </div>
 {{end}}
 
 {{define "lobbyCountdown"}}
-<div>
-    <h1>Countdown <span id="countdown_num">{{.}}</span></h1>
+<div class="countdown-overlay">
+    <h1 class="text-white">GET READY</h1>
+    <span id="countdown_num">{{.}}</span>
 </div>
 {{end}}

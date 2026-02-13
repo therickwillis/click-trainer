@@ -1,0 +1,9 @@
+<svg viewBox="0 0 800 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M0,450 C200,400 400,500 800,450 L800,600 L0,600 Z" fill="#2a8540"/>
+  <path d="M0,470 C180,430 380,520 800,480 L800,600 L0,600 Z" fill="#216a33"/>
+  <g fill="#114422" opacity="0.8">
+    <circle cx="50" cy="520" r="8"/>
+    <circle cx="750" cy="530" r="6"/>
+    <circle cx="400" cy="540" r="10"/>
+  </g>
+</svg>

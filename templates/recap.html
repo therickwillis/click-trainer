@@ -3,15 +3,15 @@
     <h1 class="text-white mb-4">Game Over!</h1>
     <div class="flex flex-col gap-2 mb-6">
         {{range $i, $p := .}}
-        <div class="flex flex-row bg-white rounded-lg p-2 items-center">
+        <div class="flex flex-row bg-white/20 backdrop-blur-sm rounded-lg p-3 items-center gap-2 text-white">
             <div class="text-lg font-bold w-8">{{inc $i}}</div>
-            <div class="grow text-left" style="color:{{$p.Color}}">{{$p.Name}}</div>
+            <div class="w-3 h-3 rounded-full" style="background-color:{{$p.Color}}"></div>
+            <div class="grow text-left font-bold">{{$p.Name}}</div>
             <div class="text-lg font-bold">{{$p.Score}} pts</div>
         </div>
         {{end}}
     </div>
-    <button hx-post="/room/play-again" hx-swap="none"
-        class="bg-blue-700 hover:bg-blue-600 p-4 border-1 cursor-pointer rounded-lg text-white focus:ring-blue-400">
+    <button type="submit" hx-post="/room/play-again" hx-swap="none">
         Play Again
     </button>
 </div>

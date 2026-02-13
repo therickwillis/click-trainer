@@ -29,7 +29,12 @@
       "Bash(playwright-cli click:*)",
       "Bash(playwright-cli fill:*)",
       "Bash(playwright-cli:*)",
-      "Bash(go test:*)"
+      "Bash(go test:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(pgrep:*)",
+      "Bash(ss:*)",
+      "Bash(kill:*)"
     ]
   }
 }

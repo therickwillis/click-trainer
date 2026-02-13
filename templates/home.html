@@ -9,7 +9,7 @@
     <link rel="icon" href="/static/favicon.ico">
 </head>
 
-<body data-scene="join" class="bg-gray-200">
+<body data-scene="home" class="bg-gray-200">
     <div class="absolute inset-0 z-10 flex flex-row h-screen">
         <div class="flex-1"></div>
         <div class="flex-1 content-center">
@@ -22,7 +22,7 @@
 
                 <div class="text-white text-center text-lg font-bold">— or —</div>
 
-                <form method="post" action="/rooms/join" class="flex flex-col items-center gap-3" style="position:static; inset:auto;">
+                <form method="post" action="/rooms/join" class="flex flex-col items-center gap-3">
                     <input name="code" type="text" required placeholder="ROOM CODE" maxlength="4"
                         style="text-transform:uppercase; letter-spacing:0.3em;" />
                     <button type="submit" class="join" style="font-size:1.2rem; padding:0.4rem 1.5rem;">Join Room</button>
@@ -48,6 +48,7 @@
             <img src="/static/cloud-2.svg" />
         </div>
     </div>
+    <div class="hills"></div>
 </body>
 
 </html>

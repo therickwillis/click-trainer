@@ -4,8 +4,6 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: url('/static/background.svg');
-  background-size: cover;
   font-family: 'Verdana', cursive;
 }
 
@@ -16,10 +14,10 @@ body {
 }
 
 h1 {
-  font-size: 5rem;
+  font-size: 3rem;
   font-weight: bolder;
-  text-shadow: 0 0.3rem 0 rgba(0,0,0,0.3);
-  -webkit-text-stroke: 0.1rem rgba(0,0,0,0.3);
+  text-shadow: 0 0.3rem 0 rgba(0, 0, 0, 0.3);
+  -webkit-text-stroke: 0.1rem rgba(0, 0, 0, 0.3);
 }
 
 h1.join {
@@ -27,10 +25,10 @@ h1.join {
   text-align: center;
 }
 
-input[type="text"]{
-  padding:0.5rem;
+input[type="text"] {
+  padding: 0.5rem;
   border-radius: 0.5rem;
-  border:0.1rem solid whitesmoke;
+  border: 0.1rem solid whitesmoke;
   box-shadow: 0 0 0.5rem whitesmoke;
   margin: 3rem 0;
   text-align: center;
@@ -38,29 +36,31 @@ input[type="text"]{
   color: white;
   max-width: 16rem;
 }
+
 input[type="text"]:focus {
   outline-color: white;
 }
 
 
 button[type=submit] {
-  background-color:#4ac91c;
-  padding:0.5rem 2rem;
-  font-size: 2rem;
+  background-color: #4ac91c;
+  padding: 0.5rem 2rem;
+  font-size: 1rem;
   border-radius: 1.2rem;
   outline: 0.2rem solid #165e53;
   border: 0.3rem solid #82e027;
   text-transform: uppercase;
-  color:white;
+  color: white;
   font-weight: 900;
-  text-shadow: 0 0.2rem #165e5333;  
-  cursor:pointer;
+  text-shadow: 0 0.2rem #165e5333;
+  cursor: pointer;
   box-shadow: 0 0.7rem #165e5355;
   transition: all 0.1s linear;
   max-width: 16rem;
 }
+
 button[type=submit]:hover,
-button[type=submit]:focus{
+button[type=submit]:focus {
   background-color: #82e027;
   outline-color: #52bb29
 }
@@ -106,43 +106,72 @@ button[type=submit]:focus{
 }
 
 
-/* defaults */
-:root {
-  --gradient-start: #434343;
-  --gradient-end: #000000;
-  --gradient-start-old: #434343;
-  --gradient-end-old: #000000;  
-  --gradient-opacity: 0.8;
+/* ===== Sky gradient system ===== */
+
+/* @property enables smooth CSS transitions on custom properties */
+@property --sky-top {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #434343;
 }
 
-body[data-scene="lobby"] {
-  --gradient-start: #754ce5;
-  --gradient-end: #3ac9e8;
+@property --sky-mid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #333333;
 }
 
-body[data-scene="combat"] {
-  --gradient-start: #2a48b7;
-  --gradient-end: #3f99d2;
+@property --sky-bottom {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #000000;
 }
 
+/* Scene palettes — Dawn to Dusk */
+
+/* Home: Sunrise — warm coral → salmon → gold */
+body[data-scene="home"] {
+  --sky-top: #e8637a;
+  --sky-mid: #f5956b;
+  --sky-bottom: #f6c358;
+}
+
+/* Join: Morning — amber → warm orange → pale gold */
 body[data-scene="join"] {
-  --gradient-start: #f7c2cb;
-  --gradient-end: #b173f8;
+  --sky-top: #e8884f;
+  --sky-mid: #f0a95b;
+  --sky-bottom: #f7d882;
 }
 
+/* Lobby: Bright Day — dodger blue → sky blue → pale horizon */
+body[data-scene="lobby"] {
+  --sky-top: #1e90ff;
+  --sky-mid: #5cb8ff;
+  --sky-bottom: #b3ddf5;
+}
+
+/* Combat: Intense Sunset — deep red → bright red → orange */
+body[data-scene="combat"] {
+  --sky-top: #8b1a1a;
+  --sky-mid: #dc3545;
+  --sky-bottom: #f07830;
+}
+
+/* Recap: Twilight — dark blue-gray → purple → pale lavender */
 body[data-scene="recap"] {
-  --gradient-start: #a18cd1;
-  --gradient-end: #fbc2eb;
+  --sky-top: #2c3e6b;
+  --sky-mid: #7b5ea7;
+  --sky-bottom: #c8b6e2;
 }
 
+/* Gradient overlay — direct sky gradient, no blend mode */
 .gradient-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: linear-gradient(180deg, var(--gradient-start), var(--gradient-end));
-  opacity: var(--gradient-opacity);
-  mix-blend-mode: multiply;
+  background: linear-gradient(180deg, var(--sky-top), var(--sky-mid), var(--sky-bottom));
   pointer-events: none;
-  z-index:1;
+  z-index: 0;
+  transition: --sky-top 0.8s ease, --sky-mid 0.8s ease, --sky-bottom 0.8s ease;
 }
 
 #scene>*:not(.gradient-overlay) {
@@ -151,45 +180,57 @@ body[data-scene="recap"] {
 }
 
 
-form {
-  position:absolute;
-  inset:0;
+.form-overlay {
+  position: absolute;
+  inset: 0;
   z-index: 10;
+}
+
+/* Hide lobby when countdown appears (HTMX inserts countdown wrapper after #lobby) */
+#scene:has(.countdown-overlay) > #lobby:first-child {
+  display: none !important;
+}
+
+#countdown_num {
+  font-size: 8rem;
+  line-height: 1;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 /* Container for the parallax effect */
 .parallax-container {
-  position: fixed; /* Establishes positioning context for absolute children */      
-  inset:0;
-  overflow: hidden; /* Hides overflowing parts during animation */  
-  height: 100vh; /* Or a fixed height */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  height: 100vh;
   width: 100%;
   z-index: 0;
-  /* For auto-moving, perspective and overflow-y: auto (used in scroll-based parallax [7, 9, 11]) are typically NOT on the container. */
 }
 
 /* Base styles for all parallax layers */
 .parallax-layer {
-  position: absolute; /* Position layers relative to the container */
-  top: 0;  
+  position: absolute;
+  top: 0;
   left: 0;
-  right:0;
-  bottom:0;  
-  white-space: nowrap;    
-  display:flex;
+  right: 0;
+  bottom: 0;
+  white-space: nowrap;
+  display: flex;
   flex-direction: row;
 }
 
 /* Specific styles and animation for the first cloud layer (middle speed) */
-.cloud-1 {  
-  animation: scrollClouds linear infinite; /* Apply the animation */
-  animation-duration: 120s; /* Medium duration */  
+.cloud-1 {
+  animation: scrollClouds linear infinite;
+  animation-duration: 120s;
 }
 
 /* Specific styles and animation for the second cloud layer (closest, fastest) */
-.cloud-2 {  
-  animation: scrollClouds linear infinite; /* Apply the animation */
-  animation-duration: 240s; /* Shorter duration for faster speed */  
+.cloud-2 {
+  animation: scrollClouds linear infinite;
+  animation-duration: 240s;
 }
 
 .parallax-layer img {
@@ -198,8 +239,87 @@ form {
   opacity: 0.7;
 }
 
-/* Keyframes for the second cloud animation */
+/* Keyframes for the cloud animation */
 @keyframes scrollClouds {
-  0% { transform: translateX(0%); }
-  100% { transform: translateX(-100%); }
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/* Stars layer — CSS radial-gradient dots */
+.parallax-layer.stars {
+  background:
+    radial-gradient(1px 1px at 10% 15%, rgba(255, 255, 255, 0.8) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 25% 35%, rgba(255, 255, 255, 0.6) 50%, transparent 100%),
+    radial-gradient(1px 1px at 40% 10%, rgba(255, 255, 255, 0.7) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 55% 45%, rgba(255, 255, 255, 0.5) 50%, transparent 100%),
+    radial-gradient(1px 1px at 70% 20%, rgba(255, 255, 255, 0.8) 50%, transparent 100%),
+    radial-gradient(1px 1px at 85% 50%, rgba(255, 255, 255, 0.6) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 15% 60%, rgba(255, 255, 255, 0.5) 50%, transparent 100%),
+    radial-gradient(1px 1px at 50% 70%, rgba(255, 255, 255, 0.7) 50%, transparent 100%),
+    radial-gradient(1px 1px at 80% 75%, rgba(255, 255, 255, 0.6) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 35% 85%, rgba(255, 255, 255, 0.5) 50%, transparent 100%),
+    radial-gradient(1px 1px at 60% 90%, rgba(255, 255, 255, 0.7) 50%, transparent 100%),
+    radial-gradient(1px 1px at 90% 5%, rgba(255, 255, 255, 0.6) 50%, transparent 100%);
+  opacity: 0.6;
+  transition: opacity 0.8s ease;
+}
+
+/* Hide stars during bright scenes */
+body[data-scene="home"] .parallax-layer.stars,
+body[data-scene="lobby"] .parallax-layer.stars {
+  opacity: 0;
+}
+
+/* Dim stars for warm scenes */
+body[data-scene="join"] .parallax-layer.stars {
+  opacity: 0.15;
+}
+
+body[data-scene="combat"] .parallax-layer.stars {
+  opacity: 0.2;
+}
+
+/* Full stars at twilight */
+body[data-scene="recap"] .parallax-layer.stars {
+  opacity: 0.8;
+}
+
+/* Per-scene cloud opacity */
+.parallax-layer.cloud-1 img,
+.parallax-layer.cloud-2 img {
+  transition: opacity 0.8s ease;
+}
+
+body[data-scene="home"] .parallax-layer img,
+body[data-scene="join"] .parallax-layer img {
+  opacity: 0.5;
+}
+
+body[data-scene="lobby"] .parallax-layer img {
+  opacity: 0.8;
+}
+
+body[data-scene="combat"] .parallax-layer img {
+  opacity: 0.4;
+}
+
+body[data-scene="recap"] .parallax-layer img {
+  opacity: 0.3;
+}
+
+/* Hills — fixed at viewport bottom */
+.hills {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30vh;
+  background: url('/static/hills.svg') bottom center / cover no-repeat;
+  z-index: 1;
+  pointer-events: none;
 }

@@ -13,9 +13,22 @@
 </head>
 
 <body hx-ext="sse" sse-connect="/room/events" data-scene="{{.Scene}}">
-    <div class="p-4 h-screen relative">
+    <div class="gradient-overlay"></div>
+    <div class="parallax-container">
+        <div class="parallax-layer stars"></div>
+        <div class="parallax-layer cloud-1">
+            <img src="/static/cloud-1.svg" />
+            <img src="/static/cloud-1.svg" />
+        </div>
+        <div class="parallax-layer cloud-2">
+            <img src="/static/cloud-2.svg" />
+            <img src="/static/cloud-2.svg" />
+        </div>
+    </div>
+    <div class="hills"></div>
+    <div class="p-4 h-screen relative" style="z-index:10;">
         <div id="scene"
-            class="h-full flex flex-col justify-center items-center md:scale-130 lg:scale-160 xl:scale-180 2xl:scale-200 3xl:scale-230 4xl:scale-260">
+            class="relative h-full flex flex-col justify-center items-center md:scale-130 lg:scale-160 xl:scale-180 2xl:scale-200 3xl:scale-230 4xl:scale-260">
             {{if eq .Scene "lobby"}}
             {{template "lobby" .}}
             {{else if eq .Scene "recap"}}
@@ -24,7 +37,6 @@
             {{template "gameContent" .}}
             {{end}}
         </div>
-        <div class="gradient-overlay"></div>
     </div>
     <div sse-swap="swap" hx-swap="true"></div>
     <div sse-swap="sceneChange" style="display:none;" hx-on:htmx:after-swap="document.body.setAttribute('data-scene', this.textContent)"></div>
@@ -38,10 +50,8 @@
 {{define "gameContent"}}
 
     <div class="flex flex-row items-center gap-4 w-full justify-center">
-        <div id="scoreboard" class="flex flex-row">
-            {{template "scoreboard" .Players}}
-        </div>
-        <div id="timer" class="bg-white rounded-lg p-1 px-2 text-sm font-bold">{{.TimeLeft}}</div>
+        {{template "scoreboard" .Players}}
+        <div id="timer" class="bg-black/40 text-white rounded-lg p-1 px-2 text-sm font-bold tabular-nums tracking-wider">{{.TimeLeft}}</div>
     </div>
     <div id="game-area" class="relative">
         <div id="targets">
@@ -55,11 +65,12 @@
 {{end}}
 
 {{define "scoreboard"}}
-<div id="scoreboard" sse-swap="scoreboard" hx-swap="outerHTML" class="flex flex-row flex-wrap gap-1 p-1 text-xs">
+<div id="scoreboard" sse-swap="scoreboard" hx-swap="outerHTML" class="flex flex-row flex-wrap gap-2 p-1 text-sm">
     {{range .}}
-    <div id="player_{{.ID}}" class="bg-white flex flex-row p-1 rounded-lg">
-        <label style="color:{{.Color}}" class="mr-2">{{ .Name }}</label>
-        <div id="player_score_{{ .ID }}">{{ .Score}}</div>
+    <div id="player_{{.ID}}" class="flex flex-row items-center gap-2 px-3 py-1.5 rounded-lg" style="background-color:{{.Color}}33; border: 2px solid {{.Color}};">
+        <div class="w-3 h-3 rounded-full" style="background-color:{{.Color}}"></div>
+        <label class="text-white font-bold">{{ .Name }}</label>
+        <div id="player_score_{{ .ID }}" class="bg-white/20 px-2 py-0.5 rounded-md text-white">{{ .Score}}</div>
     </div>
     {{end}}
 </div>
