@@ -4,11 +4,7 @@
   "service": "app",
   "workspaceFolder": "/workspace",
 
-  "features": {
-    "ghcr.io/devcontainers/features/go:1": {
-      "version": "1.24"
-    }
-  },
+  "features": {},
 
   "forwardPorts": [8080],
   "portsAttributes": {
@@ -36,9 +32,9 @@
   },
 
   "postCreateCommand": {
-    "go-tools": "go install github.com/air-verse/air@latest && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest",
     "go-deps": "cd /workspace && go mod download",
-    "wait-db": "until pg_isready -h db -U clicktrainer; do sleep 1; done"
+    "wait-db": "until pg_isready -h db -U clicktrainer; do sleep 1; done",
+    "claude-code": "sudo npm install -g @anthropic-ai/claude-code@latest"
   },
 
   "remoteEnv": {

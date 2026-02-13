@@ -54,7 +54,9 @@ func TestStore_Kill(t *testing.T) {
 	s := NewStore()
 	target := s.Add()
 
-	s.Kill(target.ID)
+	if !s.Kill(target.ID) {
+		t.Error("Kill() should return true for alive target")
+	}
 
 	list := s.GetList()
 	if len(list) != 0 {
@@ -62,10 +64,21 @@ func TestStore_Kill(t *testing.T) {
 	}
 }
 
+func TestStore_Kill_AlreadyDead(t *testing.T) {
+	s := NewStore()
+	target := s.Add()
+
+	s.Kill(target.ID)
+	if s.Kill(target.ID) {
+		t.Error("Kill() should return false for already-dead target")
+	}
+}
+
 func TestStore_Kill_Nonexistent(t *testing.T) {
 	s := NewStore()
-	// Should not panic
-	s.Kill(999)
+	if s.Kill(999) {
+		t.Error("Kill() should return false for nonexistent target")
+	}
 }
 
 func TestStore_GetList(t *testing.T) {

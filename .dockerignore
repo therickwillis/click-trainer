@@ -4,3 +4,7 @@ tmp/
 *.md
 design.svg
 .golangci.yml
+.screenshots/
+.playwright-cli/
+.playwright/
+*.png

@@ -13,3 +13,9 @@ Thumbs.db
 
 # Environment
 .env
+
+# Playwright CLI
+.screenshots/
+.playwright-cli/
+.playwright/
+*.png

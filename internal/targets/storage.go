@@ -51,12 +51,14 @@ func (s *Store) Get(id int) *Target {
 	return s.targets[id]
 }
 
-func (s *Store) Kill(id int) {
+func (s *Store) Kill(id int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if t, e := s.targets[id]; e {
+	if t, e := s.targets[id]; e && !t.Dead {
 		t.Dead = true
+		return true
 	}
+	return false
 }
 
 func (s *Store) GetList() []*Target {

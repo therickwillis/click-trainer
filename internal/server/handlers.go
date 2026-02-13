@@ -396,7 +396,11 @@ func (s *Server) handleTarget(w http.ResponseWriter, r *http.Request) {
 	target := room.Game.Targets.Get(targetId)
 	clickedAt := time.Now()
 
-	room.Game.Targets.Kill(targetId)
+	if !room.Game.Targets.Kill(targetId) {
+		// Target already dead — ignore duplicate click
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	time.AfterFunc(500*time.Millisecond, func() {
 		newTarget := room.Game.Targets.Add()
 		var buf bytes.Buffer

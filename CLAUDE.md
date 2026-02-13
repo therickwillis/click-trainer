@@ -90,3 +90,56 @@ Click Trainer is a real-time multiplayer target-clicking game built with **Go + 
 ### Entry Point
 
 `cmd/web/main.go` — calls `server.Run()` which creates stores, optional DB, and starts HTTP server.
+
+## UI Interaction with Playwright CLI
+
+`@playwright/cli` is installed in the dev container for browser-based UI testing. It provides persistent browser sessions controlled via bash commands — ideal for verifying the HTMX/SSE-driven UI.
+
+### Basic Commands
+
+```bash
+# Open the app (starts a persistent browser session)
+playwright-cli open http://localhost:8080
+
+# Take an accessibility snapshot (shows element refs for interaction)
+playwright-cli snapshot
+
+# Click an element by ref
+playwright-cli click ref123
+
+# Fill a text input by ref
+playwright-cli fill ref456 "PlayerName"
+
+# Take a screenshot (Claude can read the PNG)
+playwright-cli screenshot
+
+# Screenshot to a specific file
+playwright-cli screenshot --filename=lobby.png
+```
+
+### Multi-Player Testing with Sessions
+
+Use named sessions (`-s`) to simulate multiple players in the same room:
+
+```bash
+# Player 1 creates a room
+playwright-cli -s=player1 open http://localhost:8080
+playwright-cli -s=player1 snapshot
+playwright-cli -s=player1 click <create-room-ref>
+
+# Player 2 joins the same room
+playwright-cli -s=player2 open http://localhost:8080
+playwright-cli -s=player2 fill <code-input-ref> "ABCD"
+playwright-cli -s=player2 click <join-room-ref>
+```
+
+### Common Game Flow
+
+1. `open http://localhost:8080` — land on home page
+2. `snapshot` + `click` — create or join a room
+3. `fill` + `click` — enter player name and register
+4. `snapshot` — verify lobby state, check player list
+5. `click` — ready up
+6. `screenshot` — capture combat/recap scenes
+
+Screenshots are saved to `.screenshots/` (gitignored). Config is in `playwright-cli.json`.
