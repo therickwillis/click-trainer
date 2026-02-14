@@ -8,3 +8,9 @@ design.svg
 .playwright-cli/
 .playwright/
 *.png
+.devcontainer/
+.claude/
+.vscode/
+.idea/
+docker-bake.hcl
+playwright-cli.json

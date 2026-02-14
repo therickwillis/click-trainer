@@ -26,6 +26,27 @@ docker compose up
 
 Server starts on `http://localhost:8080` (configurable via `PORT` env var).
 
+### Cross-Platform Notes
+
+**Apple Silicon (M1/M2/M3 Macs)**:
+- Dev container auto-detects arm64 and installs the correct Go binary
+- `docker compose up` builds natively for arm64 — no emulation needed
+- Playwright Chromium works on arm64 Linux within the dev container
+
+**Windows**:
+- Use WSL2 backend in Docker Desktop (default since Docker Desktop 4.x)
+- Clone the repo inside WSL2 filesystem (`/home/...`) for best I/O performance
+- Avoid cloning to `/mnt/c/...` (Windows filesystem) — volume mounts are significantly slower
+
+**Multi-arch production images**:
+```bash
+# Build for amd64 + arm64 and push to a registry
+REGISTRY=ghcr.io/yourorg/ TAG=v1.0.0 docker buildx bake app --push
+
+# Build for local use only (native architecture)
+docker buildx bake app-local
+```
+
 ### Environment Variables
 
 | Variable | Default | Description |

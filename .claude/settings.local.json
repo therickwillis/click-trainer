@@ -34,7 +34,8 @@
       "Bash(curl:*)",
       "Bash(pgrep:*)",
       "Bash(ss:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(docker build:*)"
     ]
   }
 }
