@@ -100,22 +100,87 @@
         setTimeout(generateQR, 50);
     });
 
+    // ===== WebSocket Client for Combat Clicks =====
+    window.GameWS = (function() {
+        var ws = null;
+        var connected = false;
+
+        function connect() {
+            if (ws) return;
+            var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var url = proto + '//' + location.host + '/room/ws';
+            ws = new WebSocket(url);
+            ws.onopen = function() { connected = true; };
+            ws.onclose = function() { ws = null; connected = false; };
+            ws.onerror = function() { ws = null; connected = false; };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                connected = false;
+            }
+        }
+
+        function sendClick(targetId, points) {
+            if (ws && connected) {
+                ws.send(JSON.stringify({targetId: targetId, points: points}));
+                return true;
+            }
+            return false;
+        }
+
+        function isConnected() { return connected; }
+
+        // Manage lifecycle based on data-scene attribute
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                if (m.type === 'attributes' && m.attributeName === 'data-scene') {
+                    var scene = document.body.getAttribute('data-scene');
+                    if (scene === 'combat') {
+                        connect();
+                    } else {
+                        disconnect();
+                    }
+                }
+            });
+        });
+        observer.observe(document.body, { attributes: true, attributeFilter: ['data-scene'] });
+
+        // Connect immediately if already in combat
+        if (document.body.getAttribute('data-scene') === 'combat') {
+            connect();
+        }
+
+        return { sendClick: sendClick, isConnected: isConnected, connect: connect, disconnect: disconnect };
+    })();
+
     // ===== Hit Feedback (Points Popup + Shake + Particles) =====
     document.addEventListener('mousedown', function(e) {
-        var circle = e.target.closest('circle[hx-post]');
+        var circle = e.target.closest('circle[data-points]');
         if (!circle) return;
 
-        var hxPost = circle.getAttribute('hx-post');
-        var match = hxPost.match(/\/room\/target\/\d+\/(\d+)/);
-        if (!match) return;
-        var points = parseInt(match[1], 10);
+        var points = parseInt(circle.getAttribute('data-points'), 10);
+        if (!points) return;
+
+        var targetDiv = circle.closest('[data-target-id]');
+        if (!targetDiv) return;
+        var targetId = parseInt(targetDiv.getAttribute('data-target-id'), 10);
+
+        // Send click via WebSocket, fall back to HTTP POST
+        if (!window.GameWS || !window.GameWS.sendClick(targetId, points)) {
+            fetch('/room/target/' + targetId + '/' + points, { method: 'POST', credentials: 'same-origin' });
+        }
 
         var gameArea = document.getElementById('game-area');
         if (!gameArea) return;
 
         var rect = gameArea.getBoundingClientRect();
-        var x = e.clientX - rect.left;
-        var y = e.clientY - rect.top;
+        var scaleX = rect.width / gameArea.offsetWidth;
+        var scaleY = rect.height / gameArea.offsetHeight;
+        var x = (e.clientX - rect.left) / scaleX;
+        var y = (e.clientY - rect.top) / scaleY;
 
         spawnPointsPopup(gameArea, x, y, points);
         triggerScreenShake(gameArea);

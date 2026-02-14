@@ -82,6 +82,22 @@ func (s *Store) ValidateSession(sessionId string) bool {
 	return exists
 }
 
+func (s *Store) Remove(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, exists := s.players[id]
+	if exists {
+		delete(s.players, id)
+	}
+	return exists
+}
+
+func (s *Store) Count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.players)
+}
+
 func (s *Store) ResetAll() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

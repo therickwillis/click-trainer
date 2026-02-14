@@ -42,7 +42,11 @@
       "Bash(make test:*)",
       "Bash(make coverage:*)",
       "Bash(make lint:*)",
-      "Bash(go vet:*)"
+      "Bash(go vet:*)",
+      "Bash(go get:*)",
+      "Bash(go doc:*)",
+      "Bash(golangci-lint run:*)",
+      "Bash(go mod tidy:*)"
     ]
   }
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"clicktrainer/internal/gamedata"
 	"clicktrainer/internal/rooms"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,8 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/coder/websocket"
 )
 
 func newTestServer(t *testing.T) (*Server, *httptest.Server) {
@@ -55,6 +58,8 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	mux.HandleFunc("POST /room/register", srv.handleRegister)
 	mux.HandleFunc("POST /room/ready", srv.handleReady)
 	mux.HandleFunc("POST /room/target/", srv.handleTarget)
+	mux.HandleFunc("GET /room/ws", srv.handleWebSocket)
+	mux.HandleFunc("POST /room/leave", srv.handleLeaveRoom)
 	mux.HandleFunc("GET /room/events", srv.handleEvents)
 	mux.HandleFunc("GET /room/poll", srv.handlePoll)
 	mux.HandleFunc("POST /room/play-again", srv.handlePlayAgain)
@@ -529,6 +534,141 @@ func TestHandleRoomWithCode_InvalidCode(t *testing.T) {
 	loc := resp.Header.Get("Location")
 	if loc != "/" {
 		t.Errorf("location = %q, want %q", loc, "/")
+	}
+}
+
+func TestHandleLeaveRoom_InLobby(t *testing.T) {
+	srv, ts := newTestServer(t)
+	defer ts.Close()
+
+	room, _ := srv.Rooms.Create("host")
+	room.Game.Players.Add("p1", "Alice")
+	room.Game.Players.Add("p2", "Bob")
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	req, _ := http.NewRequest("POST", ts.URL+"/room/leave", nil)
+	req.AddCookie(&http.Cookie{Name: "room_code", Value: room.Code})
+	req.AddCookie(&http.Cookie{Name: "player_id", Value: "p1"})
+	req.AddCookie(&http.Cookie{Name: "player_name", Value: "Alice"})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	// Should have HX-Redirect header
+	if loc := resp.Header.Get("HX-Redirect"); loc != "/" {
+		t.Errorf("HX-Redirect = %q, want %q", loc, "/")
+	}
+
+	// Player should be removed
+	if room.Game.Players.Get("p1") != nil {
+		t.Error("player p1 should be removed from room")
+	}
+
+	// Room should still exist (Bob is still in it)
+	if srv.Rooms.Get(room.Code) == nil {
+		t.Error("room should still exist with remaining player")
+	}
+	if room.Game.Players.Count() != 1 {
+		t.Errorf("player count = %d, want 1", room.Game.Players.Count())
+	}
+}
+
+func TestHandleLeaveRoom_LastPlayer(t *testing.T) {
+	srv, ts := newTestServer(t)
+	defer ts.Close()
+
+	room, _ := srv.Rooms.Create("host")
+	room.Game.Players.Add("p1", "Alice")
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	req, _ := http.NewRequest("POST", ts.URL+"/room/leave", nil)
+	req.AddCookie(&http.Cookie{Name: "room_code", Value: room.Code})
+	req.AddCookie(&http.Cookie{Name: "player_id", Value: "p1"})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	// Room should be deleted
+	if srv.Rooms.Get(room.Code) != nil {
+		t.Error("room should be deleted when last player leaves")
+	}
+}
+
+func TestHandleWebSocket_Click(t *testing.T) {
+	srv, ts := newTestServer(t)
+	defer ts.Close()
+
+	room, _ := srv.Rooms.Create("host")
+	room.Game.Players.Add("ws-player", "Alice")
+	target := room.Game.Targets.Add()
+
+	// Build WebSocket URL
+	wsURL := strings.Replace(ts.URL, "http://", "ws://", 1) + "/room/ws"
+
+	// Use nhooyr.io/websocket client
+	header := http.Header{}
+	header.Set("Cookie", fmt.Sprintf("room_code=%s; player_id=ws-player", room.Code))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPHeader: header,
+	})
+	if err != nil {
+		t.Fatalf("WebSocket dial error: %v", err)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	// Send click message
+	msg := fmt.Sprintf(`{"targetId":%d,"points":3}`, target.ID)
+	if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
+		t.Fatalf("WebSocket write error: %v", err)
+	}
+
+	// Give processClick time to execute
+	time.Sleep(100 * time.Millisecond)
+
+	p := room.Game.Players.Get("ws-player")
+	if p.Score != 3 {
+		t.Errorf("score = %d, want 3", p.Score)
+	}
+}
+
+func TestProcessClick_InvalidPoints(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	room, _ := srv.Rooms.Create("host")
+	room.Game.Players.Add("p1", "Alice")
+	target := room.Game.Targets.Add()
+
+	// Points = 0 should be rejected
+	srv.processClick(room, "p1", target.ID, 0)
+	p := room.Game.Players.Get("p1")
+	if p.Score != 0 {
+		t.Errorf("score = %d, want 0 (invalid points should be rejected)", p.Score)
+	}
+
+	// Points = 5 should be rejected
+	target2 := room.Game.Targets.Add()
+	srv.processClick(room, "p1", target2.ID, 5)
+	p = room.Game.Players.Get("p1")
+	if p.Score != 0 {
+		t.Errorf("score = %d, want 0 (invalid points should be rejected)", p.Score)
 	}
 }
 

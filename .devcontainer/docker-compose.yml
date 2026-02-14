@@ -3,6 +3,8 @@ services:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
+    ports:
+      - "8080:8080"
     volumes:
       - ..:/workspace:cached
     command: sleep infinity
@@ -22,7 +24,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clicktrainer"]
+      test: [ "CMD-SHELL", "pg_isready -U clicktrainer" ]
       interval: 5s
       timeout: 3s
       retries: 5

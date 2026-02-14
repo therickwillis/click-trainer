@@ -70,6 +70,8 @@ func Run() error {
 	mux.HandleFunc("POST /room/register", srv.handleRegister)
 	mux.HandleFunc("POST /room/ready", srv.handleReady)
 	mux.HandleFunc("POST /room/target/", srv.handleTarget)
+	mux.HandleFunc("GET /room/ws", srv.handleWebSocket)
+	mux.HandleFunc("POST /room/leave", srv.handleLeaveRoom)
 	mux.HandleFunc("GET /room/events", srv.handleEvents)
 	mux.HandleFunc("GET /room/poll", srv.handlePoll)
 	mux.HandleFunc("POST /room/play-again", srv.handlePlayAgain)

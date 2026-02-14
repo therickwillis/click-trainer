@@ -6,6 +6,7 @@ import (
 	"clicktrainer/internal/db"
 	"clicktrainer/internal/gamedata"
 	"clicktrainer/internal/rooms"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/coder/websocket"
 )
 
 type Server struct {
@@ -386,6 +388,63 @@ func (s *Server) handlePoll(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// processClick handles the core logic for a target click: kill target, update score, broadcast.
+func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, points int) {
+	if points < 1 || points > 4 {
+		return
+	}
+
+	// Capture target info before killing for click recording
+	target := room.Game.Targets.Get(targetID)
+	clickedAt := time.Now()
+
+	if !room.Game.Targets.Kill(targetID) {
+		// Target already dead — ignore duplicate click
+		return
+	}
+	time.AfterFunc(500*time.Millisecond, func() {
+		newTarget := room.Game.Targets.Add()
+		var buf bytes.Buffer
+		if err := s.Tmpl.ExecuteTemplate(&buf, "target", newTarget); err != nil {
+			log.Println(err)
+		}
+		room.Broadcaster.BroadcastOOB("newTarget", buf.String())
+	})
+
+	player := room.Game.Players.UpdateScore(playerID, points)
+	if player == nil {
+		return
+	}
+
+	// Record click event asynchronously
+	if s.ClickBuffer != nil && target != nil {
+		gameID := room.Game.CurrentGameID()
+		if gameID != "" {
+			reactionMs := int(clickedAt.Sub(target.SpawnedAt).Milliseconds())
+			select {
+			case s.ClickBuffer <- db.ClickEvent{
+				GameID:     gameID,
+				PlayerID:   playerID,
+				TargetID:   targetID,
+				Points:     points,
+				TargetSize: target.Size,
+				TargetX:    target.X,
+				TargetY:    target.Y,
+				SpawnedAt:  target.SpawnedAt,
+				ClickedAt:  clickedAt,
+				ReactionMs: reactionMs,
+			}:
+			default:
+				log.Println("[DB] Click buffer full, dropping event")
+			}
+		}
+	}
+
+	targetOOB := fmt.Sprintf(`<div id="target_%d" hx-swap-oob="delete"></div>`, targetID)
+	playerOOB := fmt.Sprintf(`<div id="player_score_%s" hx-swap-oob="innerHTML">%d</div>`, player.ID, player.Score)
+	room.Broadcaster.BroadcastOOB("swap", targetOOB+playerOOB)
+}
+
 func (s *Server) handleTarget(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("[Handle:Target] Request Received")
 	room := s.getRoom(r)
@@ -407,68 +466,123 @@ func (s *Server) handleTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	strTargetId := parts[3]
-	targetId, err := strconv.Atoi(strTargetId)
+	targetID, err := strconv.Atoi(parts[3])
 	if err != nil {
-		log.Println(err)
 		http.Error(w, "Invalid target ID", http.StatusBadRequest)
 		return
 	}
-	// Capture target info before killing for click recording
-	target := room.Game.Targets.Get(targetId)
-	clickedAt := time.Now()
 
-	if !room.Game.Targets.Kill(targetId) {
-		// Target already dead — ignore duplicate click
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	time.AfterFunc(500*time.Millisecond, func() {
-		newTarget := room.Game.Targets.Add()
-		var buf bytes.Buffer
-		if err := s.Tmpl.ExecuteTemplate(&buf, "target", newTarget); err != nil {
-			log.Println(err)
-		}
-		room.Broadcaster.BroadcastOOB("newTarget", buf.String())
-	})
-
-	strPoints := parts[4]
-	points, err := strconv.Atoi(strPoints)
+	points, err := strconv.Atoi(parts[4])
 	if err != nil {
-		log.Println(err)
 		http.Error(w, "Invalid points", http.StatusBadRequest)
 		return
 	}
-	playerId := idCookie.Value
-	player := room.Game.Players.UpdateScore(playerId, points)
 
-	// Record click event asynchronously
-	if s.ClickBuffer != nil && target != nil {
-		gameID := room.Game.CurrentGameID()
-		if gameID != "" {
-			reactionMs := int(clickedAt.Sub(target.SpawnedAt).Milliseconds())
-			select {
-			case s.ClickBuffer <- db.ClickEvent{
-				GameID:     gameID,
-				PlayerID:   playerId,
-				TargetID:   targetId,
-				Points:     points,
-				TargetSize: target.Size,
-				TargetX:    target.X,
-				TargetY:    target.Y,
-				SpawnedAt:  target.SpawnedAt,
-				ClickedAt:  clickedAt,
-				ReactionMs: reactionMs,
-			}:
-			default:
-				log.Println("[DB] Click buffer full, dropping event")
+	s.processClick(room, idCookie.Value, targetID, points)
+}
+
+type clickMessage struct {
+	TargetID int `json:"targetId"`
+	Points   int `json:"points"`
+}
+
+func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	room := s.getRoom(r)
+	if room == nil {
+		http.Error(w, "Room not found", http.StatusBadRequest)
+		return
+	}
+
+	idCookie, err := r.Cookie("player_id")
+	if err != nil {
+		http.Error(w, "Not Registered", http.StatusBadRequest)
+		return
+	}
+	playerID := idCookie.Value
+
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		log.Printf("[WS] Accept error: %v\n", err)
+		return
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	ctx := r.Context()
+	for {
+		_, data, err := conn.Read(ctx)
+		if err != nil {
+			if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
+				websocket.CloseStatus(err) == websocket.StatusGoingAway ||
+				ctx.Err() != nil {
+				return
 			}
+			log.Printf("[WS] Read error: %v\n", err)
+			return
+		}
+
+		var msg clickMessage
+		if err := json.Unmarshal(data, &msg); err != nil {
+			log.Printf("[WS] Invalid message: %v\n", err)
+			continue
+		}
+
+		s.processClick(room, playerID, msg.TargetID, msg.Points)
+	}
+}
+
+func (s *Server) handleLeaveRoom(w http.ResponseWriter, r *http.Request) {
+	room := s.getRoom(r)
+	if room == nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	idCookie, err := r.Cookie("player_id")
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	playerID := idCookie.Value
+
+	room.Game.Players.Remove(playerID)
+
+	// Clear cookies
+	for _, name := range []string{"room_code", "player_id", "player_name"} {
+		http.SetCookie(w, &http.Cookie{
+			Name:   name,
+			Value:  "",
+			Path:   "/",
+			MaxAge: -1,
+		})
+	}
+
+	// If room is now empty, delete it
+	if room.Game.Players.Count() == 0 {
+		s.Rooms.Delete(room.Code)
+	} else {
+		// Broadcast removal to remaining players based on scene
+		scene := room.Game.Scene()
+		switch scene {
+		case gamedata.SceneLobby:
+			oob := fmt.Sprintf(`<div id="lobby_player%s" hx-swap-oob="delete"></div>`, playerID)
+			room.Broadcaster.BroadcastOOB("swap", oob)
+		case gamedata.SceneCombat:
+			oob := fmt.Sprintf(`<div id="player_%s" hx-swap-oob="delete"></div>`, playerID)
+			room.Broadcaster.BroadcastOOB("swap", oob)
+		case gamedata.SceneRecap:
+			rankings := room.Game.Players.GetList()
+			var buf bytes.Buffer
+			if err := s.Tmpl.ExecuteTemplate(&buf, "recap", rankings); err != nil {
+				log.Println(err)
+			}
+			recapOOB := fmt.Sprintf(`<div id="scene" hx-swap-oob="innerHTML">%s</div>`, buf.String())
+			room.Broadcaster.BroadcastOOB("swap", recapOOB)
 		}
 	}
 
-	targetOOB := fmt.Sprintf(`<div id="target_%d" hx-swap-oob="delete"></div>`, targetId)
-	playerOOB := fmt.Sprintf(`<div id="player_score_%s" hx-swap-oob="innerHTML">%d</div>`, player.ID, player.Score)
-	room.Broadcaster.BroadcastOOB("swap", targetOOB+playerOOB)
+	w.Header().Set("HX-Redirect", "/")
 }
 
 func (s *Server) handlePlayAgain(w http.ResponseWriter, r *http.Request) {

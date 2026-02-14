@@ -147,6 +147,48 @@ func TestStore_ValidateSession(t *testing.T) {
 	}
 }
 
+func TestStore_Remove(t *testing.T) {
+	s := NewStore()
+	s.Add("id1", "Alice")
+	s.Add("id2", "Bob")
+
+	if !s.Remove("id1") {
+		t.Error("Remove should return true for existing player")
+	}
+	if s.Get("id1") != nil {
+		t.Error("player should be nil after removal")
+	}
+	if len(s.GetList()) != 1 {
+		t.Errorf("expected 1 player after removal, got %d", len(s.GetList()))
+	}
+
+	if s.Remove("nonexistent") {
+		t.Error("Remove should return false for nonexistent player")
+	}
+}
+
+func TestStore_Count(t *testing.T) {
+	s := NewStore()
+	if s.Count() != 0 {
+		t.Errorf("Count = %d, want 0", s.Count())
+	}
+
+	s.Add("id1", "Alice")
+	if s.Count() != 1 {
+		t.Errorf("Count = %d, want 1", s.Count())
+	}
+
+	s.Add("id2", "Bob")
+	if s.Count() != 2 {
+		t.Errorf("Count = %d, want 2", s.Count())
+	}
+
+	s.Remove("id1")
+	if s.Count() != 1 {
+		t.Errorf("Count = %d, want 1 after removal", s.Count())
+	}
+}
+
 func TestStore_ResetAll(t *testing.T) {
 	s := NewStore()
 	s.Add("id1", "Alice")
