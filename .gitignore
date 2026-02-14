@@ -14,8 +14,10 @@ Thumbs.db
 # Environment
 .env
 
+# Test coverage
+coverage.out
+
 # Playwright CLI
-.screenshots/
+screenshots/
 .playwright-cli/
 .playwright/
-*.png

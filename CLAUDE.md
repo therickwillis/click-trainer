@@ -163,4 +163,4 @@ playwright-cli -s=player2 click <join-room-ref>
 5. `click` — ready up
 6. `screenshot` — capture combat/recap scenes
 
-Screenshots are saved to `.screenshots/` (gitignored). Config is in `playwright-cli.json`.
+Screenshots are saved to `screenshots/` (gitignored). Config is in `playwright-cli.json`.

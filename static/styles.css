@@ -323,3 +323,72 @@ body[data-scene="recap"] .parallax-layer img {
   z-index: 1;
   pointer-events: none;
 }
+
+/* ===== Hit Feedback ===== */
+
+/* Points popup — floats up and fades */
+.points-popup {
+  position: absolute;
+  pointer-events: none;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  z-index: 100;
+  animation: pointsFloat 0.6s ease-out forwards;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes pointsFloat {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 40px)) scale(0.8); }
+}
+
+/* Screen shake */
+.screen-shake {
+  animation: shake 0.15s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 2px); }
+  50% { transform: translate(3px, -2px); }
+  75% { transform: translate(-2px, -1px); }
+}
+
+/* Burst particles */
+.burst-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99;
+  transform: translate(-50%, -50%);
+  animation: particleBurst 0.4s ease-out forwards;
+}
+
+@keyframes particleBurst {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.3); }
+}
+
+/* ===== Copy Toast ===== */
+.copy-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  z-index: 200;
+  animation: toastFade 1.5s ease-in-out forwards;
+}
+
+@keyframes toastFade {
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}

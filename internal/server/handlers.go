@@ -34,9 +34,9 @@ func (s *Server) getRoom(r *http.Request) *rooms.Room {
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	// If player has a room cookie and it's valid, redirect to /room
+	// If player has a room cookie and it's valid, redirect to /room/{code}
 	if room := s.getRoom(r); room != nil {
-		http.Redirect(w, r, "/room", http.StatusSeeOther)
+		http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
 		return
 	}
 	if err := s.Tmpl.ExecuteTemplate(w, "home", nil); err != nil {
@@ -64,7 +64,7 @@ func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 	})
 
 	fmt.Printf("[Handle:CreateRoom] Created room %s\n", room.Code)
-	http.Redirect(w, r, "/room", http.StatusSeeOther)
+	http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
 }
 
 func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request) {
@@ -92,17 +92,11 @@ func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
-	http.Redirect(w, r, "/room", http.StatusSeeOther)
+	http.Redirect(w, r, "/room/"+code, http.StatusSeeOther)
 }
 
-func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:Room] Request Received")
-	room := s.getRoom(r)
-	if room == nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
+// renderRoom contains the shared logic for rendering the game room view.
+func (s *Server) renderRoom(w http.ResponseWriter, r *http.Request, room *rooms.Room) {
 	idCookie, err := r.Cookie("player_id")
 	if err == nil {
 		nameCookie, err := r.Cookie("player_name")
@@ -111,7 +105,7 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 				Name:   "player_id",
 				MaxAge: -1,
 			})
-			http.Redirect(w, r, "/room", http.StatusSeeOther)
+			http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
 			return
 		}
 
@@ -138,6 +132,34 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) handleRoomWithCode(w http.ResponseWriter, r *http.Request) {
+	code := strings.ToUpper(r.PathValue("code"))
+	room := s.Rooms.Get(code)
+	if room == nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "room_code",
+		Value:    room.Code,
+		Path:     "/",
+		HttpOnly: true,
+	})
+
+	s.renderRoom(w, r, room)
+}
+
+func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("[Handle:Room] Request Received")
+	room := s.getRoom(r)
+	if room == nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
 }
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -194,7 +216,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		room.Broadcaster.BroadcastOOB("scoreboard", buf.String())
 	}
 
-	http.Redirect(w, r, "/room", http.StatusSeeOther)
+	http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
@@ -461,7 +483,7 @@ func (s *Server) handlePlayAgain(w http.ResponseWriter, r *http.Request) {
 
 	idCookie, err := r.Cookie("player_id")
 	if err != nil {
-		http.Redirect(w, r, "/room", http.StatusSeeOther)
+		http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
 		return
 	}
 

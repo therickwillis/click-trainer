@@ -35,7 +35,14 @@
       "Bash(pgrep:*)",
       "Bash(ss:*)",
       "Bash(kill:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(golangci-lint version:*)",
+      "Bash(git -C /workspace diff .gitignore)",
+      "Bash(git -C /workspace show HEAD:.gitignore)",
+      "Bash(make test:*)",
+      "Bash(make coverage:*)",
+      "Bash(make lint:*)",
+      "Bash(go vet:*)"
     ]
   }
 }

@@ -3,7 +3,22 @@
 <div id="lobby" class="w-md">
     <h1 class="text-white">Lobby</h1>
     {{if .RoomCode}}
-    <div class="text-white text-lg font-bold mb-4 text-center">Room: <span class="text-2xl tracking-widest bg-white/20 px-3 py-1 rounded-lg">{{.RoomCode}}</span> — share with friends!</div>
+    <div class="flex flex-col items-center gap-3 mb-4">
+        <div class="text-white text-lg font-bold text-center">
+            Room: <span class="text-2xl tracking-widest bg-white/20 px-3 py-1 rounded-lg">{{.RoomCode}}</span>
+        </div>
+        <div id="qr-code" class="bg-white p-2 rounded-lg" style="width:80px; height:80px;"></div>
+        <div class="flex flex-row gap-2">
+            <button type="button" id="share-btn" onclick="shareRoom()"
+                class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold py-2 px-4 rounded-lg cursor-pointer">
+                Share Invite
+            </button>
+            <button type="button" id="copy-btn" onclick="copyRoomLink()"
+                class="bg-white/20 hover:bg-white/30 text-white text-sm font-bold py-2 px-4 rounded-lg cursor-pointer">
+                Copy Link
+            </button>
+        </div>
+    </div>
     {{end}}
     <div id="lobby_players" class="w-md flex flex-col gap-2 mb-4">
         {{range .Players}}

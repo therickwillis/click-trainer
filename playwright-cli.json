@@ -1,6 +1,6 @@
 {
   "browser": "chromium",
   "headless": true,
-  "outputDir": ".screenshots",
+  "outputDir": "screenshots",
   "viewport": { "width": 1280, "height": 720 }
 }

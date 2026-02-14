@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="icon" href="/static/favicon.ico">
 </head>
@@ -42,6 +43,254 @@
     <div sse-swap="sceneChange" style="display:none;" hx-on:htmx:after-swap="document.body.setAttribute('data-scene', this.textContent)"></div>
     <div id="game-content-conn" hx-trigger="sse:update" hx-get="/room/poll" hx-target="#game-content" hx-swap="innerHTML">
     </div>
+
+    <!-- Mute button -->
+    <button type="button" id="mute-btn" onclick="toggleMuteBtn()"
+        class="fixed top-4 right-4 z-50 bg-black/40 hover:bg-black/60 text-white rounded-full w-10 h-10 flex items-center justify-center cursor-pointer"
+        title="Toggle sound">
+        <span id="mute-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+        </span>
+    </button>
+
+    <script>
+    // ===== QR Code & Sharing =====
+    function generateQR() {
+        var container = document.getElementById('qr-code');
+        if (!container) return;
+        container.innerHTML = '';
+        var qr = qrcode(0, 'M');
+        qr.addData(window.location.href);
+        qr.make();
+        container.innerHTML = qr.createSvgTag(2, 0);
+    }
+
+    function shareRoom() {
+        var url = window.location.href;
+        if (navigator.share) {
+            navigator.share({ title: 'Join my Click Trainer room!', url: url }).catch(function() {});
+        } else {
+            copyRoomLink();
+        }
+    }
+
+    function copyRoomLink() {
+        navigator.clipboard.writeText(window.location.href).then(function() {
+            var toast = document.createElement('div');
+            toast.className = 'copy-toast';
+            toast.textContent = 'Link copied!';
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 1500);
+        });
+    }
+
+    // Hide share button if Web Share API unavailable
+    if (!navigator.share) {
+        var shareBtn = document.getElementById('share-btn');
+        if (shareBtn) shareBtn.style.display = 'none';
+    }
+
+    // Generate QR on load and after OOB swaps (Play Again)
+    generateQR();
+    document.body.addEventListener('htmx:oobAfterSwap', function() {
+        setTimeout(generateQR, 50);
+    });
+
+    // ===== Hit Feedback (Points Popup + Shake + Particles) =====
+    document.addEventListener('mousedown', function(e) {
+        var circle = e.target.closest('circle[hx-post]');
+        if (!circle) return;
+
+        var hxPost = circle.getAttribute('hx-post');
+        var match = hxPost.match(/\/room\/target\/\d+\/(\d+)/);
+        if (!match) return;
+        var points = parseInt(match[1], 10);
+
+        var gameArea = document.getElementById('game-area');
+        if (!gameArea) return;
+
+        var rect = gameArea.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+
+        spawnPointsPopup(gameArea, x, y, points);
+        triggerScreenShake(gameArea);
+        spawnBurstParticles(gameArea, x, y);
+
+        if (window.SoundEngine) SoundEngine.playHit(points);
+    });
+
+    function spawnPointsPopup(container, x, y, points) {
+        var el = document.createElement('div');
+        el.className = 'points-popup';
+        el.textContent = '+' + points;
+        var colors = ['#ffffff', '#ffeb3b', '#ff9800', '#ffd700'];
+        var idx = points <= 1 ? 0 : points <= 2 ? 1 : points <= 3 ? 2 : 3;
+        el.style.color = colors[idx];
+        el.style.fontSize = (1.2 + points * 0.3) + 'rem';
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        container.appendChild(el);
+        setTimeout(function() { el.remove(); }, 600);
+    }
+
+    function triggerScreenShake(el) {
+        el.classList.remove('screen-shake');
+        void el.offsetWidth;
+        el.classList.add('screen-shake');
+        setTimeout(function() { el.classList.remove('screen-shake'); }, 150);
+    }
+
+    function spawnBurstParticles(container, x, y) {
+        var palette = ['#ef4444','#facc15','#22c55e','#3b82f6','#f97316','#a855f7'];
+        for (var i = 0; i < 8; i++) {
+            var el = document.createElement('div');
+            el.className = 'burst-particle';
+            var angle = (Math.PI * 2 / 8) * i;
+            var dist = 20 + Math.random() * 20;
+            el.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+            el.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.backgroundColor = palette[i % palette.length];
+            container.appendChild(el);
+            setTimeout(function(e) { e.remove(); }, 400, el);
+        }
+    }
+
+    // ===== Sound Engine (Web Audio API) =====
+    window.SoundEngine = (function() {
+        var ctx = null;
+        var muted = localStorage.getItem('clicktrainer_muted') === 'true';
+
+        function getCtx() {
+            if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+            return ctx;
+        }
+
+        function playHit(points) {
+            if (muted) return;
+            var c = getCtx();
+            var osc = c.createOscillator();
+            var gain = c.createGain();
+            osc.type = 'sine';
+            var freqs = [400, 520, 660, 880];
+            var idx = points <= 1 ? 0 : points <= 2 ? 1 : points <= 3 ? 2 : 3;
+            osc.frequency.value = freqs[idx];
+            gain.gain.setValueAtTime(0.3, c.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(c.destination);
+            osc.start(c.currentTime);
+            osc.stop(c.currentTime + 0.15);
+        }
+
+        function playCountdownBeep() {
+            if (muted) return;
+            var c = getCtx();
+            var osc = c.createOscillator();
+            var gain = c.createGain();
+            osc.type = 'square';
+            osc.frequency.value = 600;
+            gain.gain.setValueAtTime(0.15, c.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(c.destination);
+            osc.start(c.currentTime);
+            osc.stop(c.currentTime + 0.1);
+        }
+
+        function playGameStart() {
+            if (muted) return;
+            var c = getCtx();
+            var notes = [523, 659, 784]; // C5, E5, G5
+            notes.forEach(function(freq, i) {
+                var osc = c.createOscillator();
+                var gain = c.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                var t = c.currentTime + i * 0.12;
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                osc.connect(gain);
+                gain.connect(c.destination);
+                osc.start(t);
+                osc.stop(t + 0.2);
+            });
+        }
+
+        function playRoundEnd() {
+            if (muted) return;
+            var c = getCtx();
+            var osc = c.createOscillator();
+            var gain = c.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, c.currentTime);
+            osc.frequency.linearRampToValueAtTime(300, c.currentTime + 0.5);
+            gain.gain.setValueAtTime(0.2, c.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.5);
+            osc.connect(gain);
+            gain.connect(c.destination);
+            osc.start(c.currentTime);
+            osc.stop(c.currentTime + 0.5);
+        }
+
+        function toggleMute() {
+            muted = !muted;
+            localStorage.setItem('clicktrainer_muted', muted);
+            return muted;
+        }
+
+        function isMuted() { return muted; }
+
+        return { playHit: playHit, playCountdownBeep: playCountdownBeep, playGameStart: playGameStart, playRoundEnd: playRoundEnd, toggleMute: toggleMute, isMuted: isMuted };
+    })();
+
+    // Mute button
+    function updateMuteIcon() {
+        var icon = document.getElementById('mute-icon');
+        if (!icon) return;
+        if (SoundEngine.isMuted()) {
+            icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+        } else {
+            icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+        }
+    }
+
+    function toggleMuteBtn() {
+        SoundEngine.toggleMute();
+        updateMuteIcon();
+    }
+
+    updateMuteIcon();
+
+    // Sound triggers for countdown and scene changes
+    (function() {
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                // Countdown beep — watch for #countdown_num content changes
+                if (m.type === 'childList') {
+                    m.addedNodes.forEach(function(node) {
+                        if (node.id === 'countdown_num' || (node.querySelector && node.querySelector('#countdown_num'))) {
+                            SoundEngine.playCountdownBeep();
+                        }
+                    });
+                }
+                // Scene change — watch data-scene attribute
+                if (m.type === 'attributes' && m.attributeName === 'data-scene') {
+                    var scene = document.body.getAttribute('data-scene');
+                    if (scene === 'combat') SoundEngine.playGameStart();
+                    if (scene === 'recap') SoundEngine.playRoundEnd();
+                }
+            });
+        });
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-scene'] });
+    })();
+    </script>
 </body>
 
 </html>
