@@ -54,7 +54,8 @@ func Run() error {
 			}
 			srv.DB = database
 			srv.ClickBuffer = make(chan db.ClickEvent, 1000)
-			go clickBatchWriter(database, srv.ClickBuffer)
+			srv.FlushSignal = make(chan chan struct{})
+			go clickBatchWriter(database, srv.ClickBuffer, srv.FlushSignal)
 			log.Println("[DB] Database connected and migrations applied")
 		}
 	} else {
@@ -87,29 +88,43 @@ func Run() error {
 	return http.ListenAndServe(addr, mux)
 }
 
-func clickBatchWriter(database *db.DB, buffer chan db.ClickEvent) {
+func clickBatchWriter(database *db.DB, buffer chan db.ClickEvent, flushSignal chan chan struct{}) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	batch := make([]db.ClickEvent, 0, 50)
+
+	writeBatch := func() {
+		if len(batch) > 0 {
+			if err := database.BatchRecordClicks(batch); err != nil {
+				log.Printf("[DB] BatchRecordClicks error: %v\n", err)
+			}
+			batch = batch[:0]
+		}
+	}
 
 	for {
 		select {
 		case ev := <-buffer:
 			batch = append(batch, ev)
 			if len(batch) >= 50 {
-				if err := database.BatchRecordClicks(batch); err != nil {
-					log.Printf("[DB] BatchRecordClicks error: %v\n", err)
-				}
-				batch = batch[:0]
+				writeBatch()
 			}
 		case <-ticker.C:
-			if len(batch) > 0 {
-				if err := database.BatchRecordClicks(batch); err != nil {
-					log.Printf("[DB] BatchRecordClicks error: %v\n", err)
+			writeBatch()
+		case done := <-flushSignal:
+			// Drain any remaining events from the buffer channel
+		drain:
+			for {
+				select {
+				case ev := <-buffer:
+					batch = append(batch, ev)
+				default:
+					break drain
 				}
-				batch = batch[:0]
 			}
+			writeBatch()
+			close(done)
 		}
 	}
 }

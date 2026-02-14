@@ -46,7 +46,17 @@
       "Bash(go get:*)",
       "Bash(go doc:*)",
       "Bash(golangci-lint run:*)",
-      "Bash(go mod tidy:*)"
+      "Bash(go mod tidy:*)",
+      "Bash(psql:*)",
+      "Bash(APP_URL=\"http://localhost:8080\" DATABASE_URL=\"postgres://clicktrainer:clicktrainer@db:5432/clicktrainer?sslmode=disable\" ROUND_DURATION=5 bash:*)",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers playwright-cli open:*)",
+      "Bash(npx playwright-core:*)",
+      "Bash(npx playwright:*)",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers playwright-cli install:*)",
+      "Bash(ls:*)",
+      "Bash(xargs:*)",
+      "Bash(lsof:*)",
+      "Bash(APP_URL=http://localhost:8080 DATABASE_URL=\"postgres://clicktrainer:clicktrainer@db:5432/clicktrainer?sslmode=disable\" ROUND_DURATION=5 python3:*)"
     ]
   }
 }

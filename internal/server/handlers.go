@@ -22,8 +22,9 @@ import (
 type Server struct {
 	Rooms       *rooms.Store
 	Tmpl        *template.Template
-	DB          *db.DB          // nil if no database configured
-	ClickBuffer chan db.ClickEvent // nil if no database configured
+	DB          *db.DB              // nil if no database configured
+	ClickBuffer chan db.ClickEvent   // nil if no database configured
+	FlushSignal chan chan struct{}    // nil if no database configured
 }
 
 // getRoom resolves the current room from the room_code cookie.
@@ -50,8 +51,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("[Handle:CreateRoom] Request Received")
 
-	hostID := uuid.New().String()
-	room, err := s.Rooms.Create(hostID)
+	room, err := s.Rooms.Create("")
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to create room", http.StatusInternalServerError)
@@ -113,6 +113,11 @@ func (s *Server) renderRoom(w http.ResponseWriter, r *http.Request, room *rooms.
 
 		if !room.Game.Players.ValidateSession(idCookie.Value) {
 			player := room.Game.Players.Add(idCookie.Value, nameCookie.Value)
+			if s.DB != nil {
+				if err := s.DB.UpsertPlayer(idCookie.Value, nameCookie.Value, player.Color); err != nil {
+					log.Printf("[DB] UpsertPlayer error: %v\n", err)
+				}
+			}
 			var buf bytes.Buffer
 			if err := s.Tmpl.ExecuteTemplate(&buf, "lobbyPlayer", player); err != nil {
 				log.Println(err)
@@ -195,6 +200,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	player := room.Game.Players.Add(id, name)
 
+	if room.HostID == "" {
+		room.HostID = id
+	}
+
 	if s.DB != nil {
 		if err := s.DB.UpsertPlayer(id, name, player.Color); err != nil {
 			log.Printf("[DB] UpsertPlayer error: %v\n", err)
@@ -270,9 +279,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 					time.Sleep(1 * time.Second)
 				}
 
-				room.Game.StartRound()
-
-				// Create game record in DB
+				// Create game record in DB before starting round so gameID is available for clicks
 				if s.DB != nil {
 					gameID, err := s.DB.CreateGame(room.Code, room.HostID, room.Game.Config.RoundDuration*1000)
 					if err != nil {
@@ -281,6 +288,8 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 						room.Game.SetCurrentGameID(gameID)
 					}
 				}
+
+				room.Game.StartRound()
 
 				data := room.Game.Get(idCookie.Value)
 				var gameBuf bytes.Buffer
@@ -320,6 +329,9 @@ func (s *Server) startRoundTimer(room *rooms.Room) {
 	}
 
 	rankings := room.Game.EndRound()
+
+	// Flush pending clicks before persisting game results
+	s.flushClickBuffer()
 
 	// Persist game results and award badges
 	if s.DB != nil {
@@ -443,6 +455,16 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 	targetOOB := fmt.Sprintf(`<div id="target_%d" hx-swap-oob="delete"></div>`, targetID)
 	playerOOB := fmt.Sprintf(`<div id="player_score_%s" hx-swap-oob="innerHTML">%d</div>`, player.ID, player.Score)
 	room.Broadcaster.BroadcastOOB("swap", targetOOB+playerOOB)
+}
+
+// flushClickBuffer waits for the click batch writer to drain and write all pending clicks.
+func (s *Server) flushClickBuffer() {
+	if s.FlushSignal == nil {
+		return
+	}
+	done := make(chan struct{})
+	s.FlushSignal <- done
+	<-done
 }
 
 func (s *Server) handleTarget(w http.ResponseWriter, r *http.Request) {

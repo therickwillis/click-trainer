@@ -44,6 +44,10 @@ func (d *DB) Query(query string, args ...any) (*sql.Rows, error) {
 	return d.conn.Query(query, args...)
 }
 
+func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
+	return d.conn.Exec(query, args...)
+}
+
 func (d *DB) Migrate() error {
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
