@@ -134,9 +134,11 @@ playwright-cli fill ref456 "PlayerName"
 # Take a screenshot (Claude can read the PNG)
 playwright-cli screenshot
 
-# Screenshot to a specific file
-playwright-cli screenshot --filename=lobby.png
+# Screenshot to a specific file — ALWAYS use screenshots/ prefix
+playwright-cli screenshot --filename=screenshots/lobby.png
 ```
+
+**IMPORTANT**: When using `--filename`, always prefix with `screenshots/` (e.g. `--filename=screenshots/combat.png`). Without the prefix, files land in the repo root and get committed accidentally. The `screenshots/` directory is gitignored.
 
 ### Multi-Player Testing with Sessions
 

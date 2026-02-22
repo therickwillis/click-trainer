@@ -634,8 +634,8 @@ func TestHandleWebSocket_Click(t *testing.T) {
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	// Send click message
-	msg := fmt.Sprintf(`{"targetId":%d,"points":3}`, target.ID)
+	// Send click message (new format: t=click, id=targetID, p=points)
+	msg := fmt.Sprintf(`{"t":"click","id":%d,"p":3}`, target.ID)
 	if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
 		t.Fatalf("WebSocket write error: %v", err)
 	}

@@ -100,19 +100,34 @@
         setTimeout(generateQR, 50);
     });
 
-    // ===== WebSocket Client for Combat Clicks =====
+    // ===== WebSocket Client for Combat Clicks + Cursor Sharing =====
     window.GameWS = (function() {
         var ws = null;
         var connected = false;
+        var cursors = {}; // playerID -> DOM element
+        var lastMoveTime = 0;
+        var THROTTLE_MS = 50;
 
         function connect() {
             if (ws) return;
             var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
             var url = proto + '//' + location.host + '/room/ws';
             ws = new WebSocket(url);
-            ws.onopen = function() { connected = true; };
+            ws.onopen = function() {
+                connected = true;
+                setupCursorTracking();
+            };
             ws.onclose = function() { ws = null; connected = false; };
             ws.onerror = function() { ws = null; connected = false; };
+            ws.onmessage = function(e) {
+                var msg;
+                try { msg = JSON.parse(e.data); } catch(_) { return; }
+                switch (msg.t) {
+                    case 'move': handleRemoteMove(msg); break;
+                    case 'kill': handleRemoteKill(msg); break;
+                    case 'leave': handleRemoteLeave(msg); break;
+                }
+            };
         }
 
         function disconnect() {
@@ -121,17 +136,98 @@
                 ws = null;
                 connected = false;
             }
+            cleanupCursors();
         }
 
         function sendClick(targetId, points) {
             if (ws && connected) {
-                ws.send(JSON.stringify({targetId: targetId, points: points}));
+                ws.send(JSON.stringify({t: 'click', id: targetId, p: points}));
                 return true;
             }
             return false;
         }
 
         function isConnected() { return connected; }
+
+        // --- Cursor tracking ---
+        function setupCursorTracking() {
+            var gameArea = document.getElementById('game-area');
+            if (!gameArea || gameArea._cursorTracking) return;
+            gameArea._cursorTracking = true;
+            gameArea.addEventListener('mousemove', function(e) {
+                var now = Date.now();
+                if (now - lastMoveTime < THROTTLE_MS) return;
+                lastMoveTime = now;
+                if (!ws || !connected) return;
+                var rect = gameArea.getBoundingClientRect();
+                var scaleX = rect.width / gameArea.offsetWidth;
+                var scaleY = rect.height / gameArea.offsetHeight;
+                var x = Math.round((e.clientX - rect.left) / scaleX);
+                var y = Math.round((e.clientY - rect.top) / scaleY);
+                ws.send(JSON.stringify({t: 'move', x: x, y: y}));
+            });
+        }
+
+        // --- Remote cursor ---
+        function handleRemoteMove(msg) {
+            var gameArea = document.getElementById('game-area');
+            if (!gameArea) return;
+            var el = cursors[msg.id];
+            if (!el) {
+                el = document.createElement('div');
+                el.className = 'player-cursor';
+                el.setAttribute('data-player-id', msg.id);
+                el.style.setProperty('--cursor-color', msg.c || '#ffffff');
+                var label = document.createElement('span');
+                label.className = 'player-cursor-label';
+                label.textContent = msg.n || '';
+                label.style.color = msg.c || '#ffffff';
+                el.appendChild(label);
+                gameArea.appendChild(el);
+                cursors[msg.id] = el;
+            }
+            el.style.transform = 'translate(' + msg.x + 'px, ' + msg.y + 'px)';
+        }
+
+        // --- Remote kill effect ---
+        function handleRemoteKill(msg) {
+            var gameArea = document.getElementById('game-area');
+            if (!gameArea) return;
+            var el = document.createElement('div');
+            el.className = 'kill-effect';
+            el.style.left = msg.x + 'px';
+            el.style.top = msg.y + 'px';
+
+            var ripple = document.createElement('div');
+            ripple.className = 'kill-ripple';
+            ripple.style.borderColor = msg.c || '#ffffff';
+            el.appendChild(ripple);
+
+            var label = document.createElement('div');
+            label.className = 'kill-label';
+            label.textContent = msg.n + ' +' + msg.p;
+            label.style.backgroundColor = msg.c || '#ffffff';
+            el.appendChild(label);
+
+            gameArea.appendChild(el);
+            setTimeout(function() { el.remove(); }, 1000);
+        }
+
+        // --- Remote leave ---
+        function handleRemoteLeave(msg) {
+            var el = cursors[msg.id];
+            if (el) {
+                el.remove();
+                delete cursors[msg.id];
+            }
+        }
+
+        function cleanupCursors() {
+            for (var id in cursors) {
+                cursors[id].remove();
+            }
+            cursors = {};
+        }
 
         // Manage lifecycle based on data-scene attribute
         var observer = new MutationObserver(function(mutations) {
@@ -170,7 +266,7 @@
 
         // Send click via WebSocket, fall back to HTTP POST
         if (!window.GameWS || !window.GameWS.sendClick(targetId, points)) {
-            fetch('/room/target/' + targetId + '/' + points, { method: 'POST', credentials: 'same-origin' });
+            fetch('/room/target/' + targetId + '/' + points, {method: 'POST', credentials: 'same-origin'});
         }
 
         var gameArea = document.getElementById('game-area');

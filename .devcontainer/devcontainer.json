@@ -34,7 +34,6 @@
   "postCreateCommand": {
     "go-deps": "cd /workspace && go mod download",
     "wait-db": "until pg_isready -h db -U clicktrainer; do sleep 1; done",
-    "claude-code": "sudo npm install -g @anthropic-ai/claude-code@latest",
     "playwright-init": "cd /workspace && playwright-cli install chromium"
   },
 

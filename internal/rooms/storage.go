@@ -6,6 +6,7 @@ import (
 	"clicktrainer/internal/gamedata"
 	"clicktrainer/internal/players"
 	"clicktrainer/internal/targets"
+	"clicktrainer/internal/wshub"
 	"fmt"
 	"sync"
 	"time"
@@ -47,11 +48,13 @@ func (s *Store) Create(hostID string) (*Room, error) {
 		bus := events.NewBus()
 		game := gamedata.NewGame(ps, ts, bus, s.cfg)
 		b := broadcast.NewBroadcaster(bus)
+		hub := wshub.NewHub()
 
 		room := &Room{
 			Code:        code,
 			Game:        game,
 			Broadcaster: b,
+			Hub:         hub,
 			CreatedAt:   time.Now(),
 			HostID:      hostID,
 		}

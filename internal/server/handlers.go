@@ -6,6 +6,7 @@ import (
 	"clicktrainer/internal/db"
 	"clicktrainer/internal/gamedata"
 	"clicktrainer/internal/rooms"
+	"clicktrainer/internal/wshub"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -401,9 +402,10 @@ func (s *Server) handlePoll(w http.ResponseWriter, r *http.Request) {
 }
 
 // processClick handles the core logic for a target click: kill target, update score, broadcast.
-func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, points int) {
+// Returns (ok, targetX, targetY) so callers can use the position for kill effects.
+func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, points int) (bool, int, int) {
 	if points < 1 || points > 4 {
-		return
+		return false, 0, 0
 	}
 
 	// Capture target info before killing for click recording
@@ -412,7 +414,7 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 
 	if !room.Game.Targets.Kill(targetID) {
 		// Target already dead — ignore duplicate click
-		return
+		return false, 0, 0
 	}
 	time.AfterFunc(500*time.Millisecond, func() {
 		newTarget := room.Game.Targets.Add()
@@ -425,7 +427,12 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 
 	player := room.Game.Players.UpdateScore(playerID, points)
 	if player == nil {
-		return
+		return false, 0, 0
+	}
+
+	var targetX, targetY int
+	if target != nil {
+		targetX, targetY = target.X, target.Y
 	}
 
 	// Record click event asynchronously
@@ -455,6 +462,8 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 	targetOOB := fmt.Sprintf(`<div id="target_%d" hx-swap-oob="delete"></div>`, targetID)
 	playerOOB := fmt.Sprintf(`<div id="player_score_%s" hx-swap-oob="innerHTML">%d</div>`, player.ID, player.Score)
 	room.Broadcaster.BroadcastOOB("swap", targetOOB+playerOOB)
+
+	return true, targetX, targetY
 }
 
 // flushClickBuffer waits for the click batch writer to drain and write all pending clicks.
@@ -500,12 +509,7 @@ func (s *Server) handleTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.processClick(room, idCookie.Value, targetID, points)
-}
-
-type clickMessage struct {
-	TargetID int `json:"targetId"`
-	Points   int `json:"points"`
+	_, _, _ = s.processClick(room, idCookie.Value, targetID, points)
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -522,6 +526,12 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	playerID := idCookie.Value
 
+	player := room.Game.Players.Get(playerID)
+	if player == nil {
+		http.Error(w, "Player not found", http.StatusBadRequest)
+		return
+	}
+
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
 	})
@@ -531,7 +541,20 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
+	client := &wshub.Client{
+		PlayerID: playerID,
+		Name:     player.Name,
+		Color:    player.Color,
+		Conn:     conn,
+		Send:     make(chan []byte, 16),
+	}
+
+	room.Hub.Register(client)
+	defer room.Hub.Unregister(playerID)
+
 	ctx := r.Context()
+	go client.WritePump(ctx)
+
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
@@ -544,13 +567,36 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var msg clickMessage
+		var msg wshub.ClientMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
 			log.Printf("[WS] Invalid message: %v\n", err)
 			continue
 		}
 
-		s.processClick(room, playerID, msg.TargetID, msg.Points)
+		switch msg.Type {
+		case "move":
+			room.Hub.BroadcastExcept(playerID, wshub.ServerMessage{
+				Type:     "move",
+				PlayerID: playerID,
+				Name:     client.Name,
+				Color:    client.Color,
+				X:        msg.X,
+				Y:        msg.Y,
+			})
+		case "click":
+			ok, tx, ty := s.processClick(room, playerID, msg.TargetID, msg.Points)
+			if ok {
+				room.Hub.BroadcastExcept(playerID, wshub.ServerMessage{
+					Type:     "kill",
+					PlayerID: playerID,
+					Name:     client.Name,
+					Color:    client.Color,
+					X:        tx,
+					Y:        ty,
+					Points:   msg.Points,
+				})
+			}
+		}
 	}
 }
 

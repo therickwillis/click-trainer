@@ -35,8 +35,13 @@ ENV NODE_VERSION=20
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
-RUN npm install -g @playwright/cli@latest
+RUN npm install -g @playwright/cli@latest @anthropic-ai/claude-code@latest
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH \
     && playwright-cli install chromium \
     && chmod -R o+rx $PLAYWRIGHT_BROWSERS_PATH
+
+# Allow vscode user to update globally-installed npm packages (e.g. claude-code)
+RUN NPM_GLOBAL="$(npm root -g)" \
+    && chown -R vscode:vscode "$NPM_GLOBAL" \
+    && chown -R vscode:vscode "$(dirname "$(which claude)")"

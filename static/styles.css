@@ -392,3 +392,95 @@ body[data-scene="recap"] .parallax-layer img {
   70% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* ===== Remote Player Cursors ===== */
+.player-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 150;
+  will-change: transform;
+  transition: transform 0.05s linear;
+}
+
+.player-cursor::before,
+.player-cursor::after {
+  content: '';
+  position: absolute;
+  background: var(--cursor-color, #ffffff);
+  border-radius: 1px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Vertical crosshair line */
+.player-cursor::before {
+  width: 2px;
+  height: 16px;
+  left: -1px;
+  top: -8px;
+}
+
+/* Horizontal crosshair line */
+.player-cursor::after {
+  width: 16px;
+  height: 2px;
+  left: -8px;
+  top: -1px;
+}
+
+.player-cursor-label {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  opacity: 0.8;
+}
+
+/* ===== Kill Effects ===== */
+.kill-effect {
+  position: absolute;
+  pointer-events: none;
+  z-index: 140;
+  transform: translate(-50%, -50%);
+}
+
+.kill-ripple {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  animation: killRippleExpand 0.8s ease-out forwards;
+}
+
+@keyframes killRippleExpand {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+}
+
+.kill-label {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  animation: killLabelFloat 1s ease-out forwards;
+}
+
+@keyframes killLabelFloat {
+  0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+}
