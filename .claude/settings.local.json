@@ -63,7 +63,27 @@
       "Bash(ROUND_DURATION=15 python3 scripts/bot.py --skill elite --verbose 2>&1)",
       "Bash(python3 -m py_compile /workspace/scripts/bot.py && ROUND_DURATION=15 python3 scripts/bot.py --skill expert 2>&1)",
       "Bash(python3 -m py_compile /workspace/scripts/bot.py && ROUND_DURATION=15 python3 scripts/bot.py --skill beginner 2>&1)",
-      "Bash(chmod +x /workspace/scripts/swarm.py && python3 -c \"import ast, sys; ast.parse\\(open\\('scripts/swarm.py'\\).read\\(\\)\\); print\\('syntax ok'\\)\" 2>&1)"
+      "Bash(chmod +x /workspace/scripts/swarm.py && python3 -c \"import ast, sys; ast.parse\\(open\\('scripts/swarm.py'\\).read\\(\\)\\); print\\('syntax ok'\\)\" 2>&1)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(claude plugin list 2>&1 | head -50)",
+      "Bash(claude plugin install --help 2>&1)",
+      "Bash(claude plugin install frontend-design --help 2>&1; claude plugin search frontend-design 2>&1)",
+      "Bash(claude plugin --help 2>&1)",
+      "Bash(claude plugin marketplace --help 2>&1)",
+      "Bash(claude plugin marketplace list 2>&1)",
+      "Bash(claude plugin install frontend-design 2>&1 || true)",
+      "Bash(claude plugin list 2>&1)",
+      "Bash(claude plugin list --help 2>&1 && claude plugin list -v 2>&1)",
+      "Bash(claude plugin list --json 2>&1)",
+      "Bash(claude)",
+      "Bash(claude plugin list)",
+      "Bash(head -50 /home/vscode/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/*.json 2>/dev/null | head -100)",
+      "Bash(head -30 /home/vscode/.claude/plugins/cache/claude-plugins-official/frontend-design/aa296ec81e8c/skills/frontend-design/*.yaml 2>/dev/null)",
+      "WebSearch",
+      "Bash(claude --version 2>/dev/null || echo \"not found\")",
+      "Bash(claude plugin install frontend-design 2>&1)",
+      "Bash(claude plugin list; echo \"exit: $?\")",
+      "Bash(gh api:*)"
     ]
   }
 }

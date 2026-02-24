@@ -34,7 +34,8 @@
   "postCreateCommand": {
     "go-deps": "cd /workspace && go mod download",
     "wait-db": "until pg_isready -h db -U clicktrainer; do sleep 1; done",
-    "playwright-init": "cd /workspace && playwright-cli install chromium"
+    "playwright-init": "cd /workspace && playwright-cli install chromium",
+    "claude-plugin": "claude plugin marketplace add anthropics/claude-code && claude plugin install frontend-design"
   },
 
   "remoteEnv": {
