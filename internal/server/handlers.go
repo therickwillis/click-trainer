@@ -38,12 +38,11 @@ func (s *Server) getRoom(r *http.Request) *rooms.Room {
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	// If player has a room cookie and it's valid, redirect to /room/{code}
+	data := map[string]any{}
 	if room := s.getRoom(r); room != nil {
-		http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
-		return
+		data["RejoinCode"] = room.Code
 	}
-	if err := s.Tmpl.ExecuteTemplate(w, "home", nil); err != nil {
+	if err := s.Tmpl.ExecuteTemplate(w, "home", data); err != nil {
 		log.Println(err)
 		http.Error(w, "Error rendering home page", http.StatusInternalServerError)
 	}
@@ -101,34 +100,9 @@ func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request) {
 // renderRoom contains the shared logic for rendering the game room view.
 func (s *Server) renderRoom(w http.ResponseWriter, r *http.Request, room *rooms.Room) {
 	idCookie, err := r.Cookie("player_id")
-	if err == nil {
-		nameCookie, err := r.Cookie("player_name")
-		if err != nil {
-			http.SetCookie(w, &http.Cookie{
-				Name:   "player_id",
-				MaxAge: -1,
-			})
-			http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
-			return
-		}
-
-		if !room.Game.Players.ValidateSession(idCookie.Value) {
-			player := room.Game.Players.Add(idCookie.Value, nameCookie.Value)
-			if s.DB != nil {
-				if err := s.DB.UpsertPlayer(idCookie.Value, nameCookie.Value, player.Color); err != nil {
-					log.Printf("[DB] UpsertPlayer error: %v\n", err)
-				}
-			}
-			var buf bytes.Buffer
-			if err := s.Tmpl.ExecuteTemplate(&buf, "lobbyPlayer", player); err != nil {
-				log.Println(err)
-			}
-			room.Broadcaster.BroadcastOOB("newPlayer", buf.String())
-		}
-
+	if err == nil && room.Game.Players.ValidateSession(idCookie.Value) {
 		data := room.Game.Get(idCookie.Value)
 		data.RoomCode = room.Code
-
 		if err := s.Tmpl.ExecuteTemplate(w, "game", data); err != nil {
 			log.Println(err)
 			http.Error(w, "Error rendering game view", http.StatusInternalServerError)
@@ -136,6 +110,7 @@ func (s *Server) renderRoom(w http.ResponseWriter, r *http.Request, room *rooms.
 		return
 	}
 
+	// No valid session in this room — show the join form.
 	if err := s.Tmpl.ExecuteTemplate(w, "join", map[string]string{"RoomCode": room.Code}); err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -189,12 +164,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "player_id",
 		Value:    id,
-		Path:     "/",
-		HttpOnly: true,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name:     "player_name",
-		Value:    name,
 		Path:     "/",
 		HttpOnly: true,
 	})
@@ -601,23 +570,12 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLeaveRoom(w http.ResponseWriter, r *http.Request) {
+	// Read state before clearing cookies.
 	room := s.getRoom(r)
-	if room == nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
+	idCookie, idErr := r.Cookie("player_id")
 
-	idCookie, err := r.Cookie("player_id")
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-	playerID := idCookie.Value
-
-	room.Game.Players.Remove(playerID)
-
-	// Clear cookies
-	for _, name := range []string{"room_code", "player_id", "player_name"} {
+	// Always clear session cookies so the user is never stuck.
+	for _, name := range []string{"room_code", "player_id"} {
 		http.SetCookie(w, &http.Cookie{
 			Name:   name,
 			Value:  "",
@@ -626,11 +584,27 @@ func (s *Server) handleLeaveRoom(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// If room is now empty, delete it
+	redirectHome := func() {
+		if r.Header.Get("HX-Request") != "" {
+			w.Header().Set("HX-Redirect", "/")
+		} else {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+		}
+	}
+
+	if room == nil || idErr != nil {
+		redirectHome()
+		return
+	}
+	playerID := idCookie.Value
+
+	room.Game.Players.Remove(playerID)
+
+	// If room is now empty, delete it.
 	if room.Game.Players.Count() == 0 {
 		s.Rooms.Delete(room.Code)
 	} else {
-		// Broadcast removal to remaining players based on scene
+		// Broadcast removal to remaining players based on scene.
 		scene := room.Game.Scene()
 		switch scene {
 		case gamedata.SceneLobby:
@@ -650,7 +624,7 @@ func (s *Server) handleLeaveRoom(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("HX-Redirect", "/")
+	redirectHome()
 }
 
 func (s *Server) handlePlayAgain(w http.ResponseWriter, r *http.Request) {

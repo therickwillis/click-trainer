@@ -553,7 +553,7 @@ func TestHandleLeaveRoom_InLobby(t *testing.T) {
 	req, _ := http.NewRequest("POST", ts.URL+"/room/leave", nil)
 	req.AddCookie(&http.Cookie{Name: "room_code", Value: room.Code})
 	req.AddCookie(&http.Cookie{Name: "player_id", Value: "p1"})
-	req.AddCookie(&http.Cookie{Name: "player_name", Value: "Alice"})
+	req.Header.Set("HX-Request", "true")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -595,6 +595,7 @@ func TestHandleLeaveRoom_LastPlayer(t *testing.T) {
 	req, _ := http.NewRequest("POST", ts.URL+"/room/leave", nil)
 	req.AddCookie(&http.Cookie{Name: "room_code", Value: room.Code})
 	req.AddCookie(&http.Cookie{Name: "player_id", Value: "p1"})
+	req.Header.Set("HX-Request", "true")
 
 	resp, err := client.Do(req)
 	if err != nil {

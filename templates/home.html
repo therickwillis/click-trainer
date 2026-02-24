@@ -16,6 +16,22 @@
             <div class="flex flex-col justify-center items-center gap-6">
                 <h1 class="join">CLICK<br>TRAINER</h1>
 
+                {{if .}}{{if .RejoinCode}}
+                <div class="flex flex-col items-center gap-2 bg-white/15 backdrop-blur-sm rounded-xl px-6 py-4 w-full">
+                    <div class="text-white/70 text-sm font-semibold uppercase tracking-wider">Active Room</div>
+                    <div class="text-white text-2xl font-bold tracking-widest">{{.RejoinCode}}</div>
+                    <a href="/room/{{.RejoinCode}}"
+                        class="join" style="font-size:1.1rem; padding:0.4rem 1.8rem;">Rejoin Room</a>
+                    <form method="post" action="/room/leave">
+                        <button type="submit"
+                            class="text-white/50 hover:text-white/80 text-sm underline bg-transparent border-none cursor-pointer mt-1">
+                            Leave &amp; start fresh
+                        </button>
+                    </form>
+                </div>
+                <div class="text-white/50 text-center text-sm font-bold">— or start a new game —</div>
+                {{end}}{{end}}
+
                 <form method="post" action="/rooms/create">
                     <button type="submit" class="join">Create Room</button>
                 </form>
