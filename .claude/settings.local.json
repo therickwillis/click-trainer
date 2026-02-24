@@ -56,7 +56,14 @@
       "Bash(ls:*)",
       "Bash(xargs:*)",
       "Bash(lsof:*)",
-      "Bash(APP_URL=http://localhost:8080 DATABASE_URL=\"postgres://clicktrainer:clicktrainer@db:5432/clicktrainer?sslmode=disable\" ROUND_DURATION=5 python3:*)"
+      "Bash(APP_URL=http://localhost:8080 DATABASE_URL=\"postgres://clicktrainer:clicktrainer@db:5432/clicktrainer?sslmode=disable\" ROUND_DURATION=5 python3:*)",
+      "Bash(python3 -m py_compile /workspace/scripts/bot.py && echo \"OK\")",
+      "Bash(python3 /workspace/scripts/bot.py --help)",
+      "Bash(python3 scripts/bot.py --skill elite --verbose 2>&1 | head -200)",
+      "Bash(ROUND_DURATION=15 python3 scripts/bot.py --skill elite --verbose 2>&1)",
+      "Bash(python3 -m py_compile /workspace/scripts/bot.py && ROUND_DURATION=15 python3 scripts/bot.py --skill expert 2>&1)",
+      "Bash(python3 -m py_compile /workspace/scripts/bot.py && ROUND_DURATION=15 python3 scripts/bot.py --skill beginner 2>&1)",
+      "Bash(chmod +x /workspace/scripts/swarm.py && python3 -c \"import ast, sys; ast.parse\\(open\\('scripts/swarm.py'\\).read\\(\\)\\); print\\('syntax ok'\\)\" 2>&1)"
     ]
   }
 }
