@@ -3,68 +3,51 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Click Trainer</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="icon" href="/static/favicon.ico">
 </head>
 
-<body data-scene="home" class="bg-gray-200">
-    <div class="absolute inset-0 z-10 flex flex-row h-screen">
-        <div class="flex-1"></div>
-        <div class="flex-1 content-center">
-            <div class="flex flex-col justify-center items-center gap-6">
-                <h1 class="join">CLICK<br>TRAINER</h1>
+<body data-scene="home">
+    <div class="scene-bg"></div>
+    <div class="page-layout">
+        <div class="page-content">
+            <h1>CLICK<br>TRAINER</h1>
 
-                {{if .}}{{if .RejoinCode}}
-                <div class="flex flex-col items-center gap-2 bg-white/15 backdrop-blur-sm rounded-xl px-6 py-4 w-full">
-                    <div class="text-white/70 text-sm font-semibold uppercase tracking-wider">Active Room</div>
-                    <div class="text-white text-2xl font-bold tracking-widest">{{.RejoinCode}}</div>
-                    <a href="/room/{{.RejoinCode}}"
-                        class="join" style="font-size:1.1rem; padding:0.4rem 1.8rem;">Rejoin Room</a>
-                    <form method="post" action="/room/leave">
-                        <button type="submit"
-                            class="text-white/50 hover:text-white/80 text-sm underline bg-transparent border-none cursor-pointer mt-1">
-                            Leave &amp; start fresh
-                        </button>
-                    </form>
-                </div>
-                <div class="text-white/50 text-center text-sm font-bold">— or start a new game —</div>
-                {{end}}{{end}}
-
-                <form method="post" action="/rooms/create">
-                    <button type="submit" class="join">Create Room</button>
+            {{if .}}{{if .RejoinCode}}
+            <div class="rejoin-card">
+                <div class="rejoin-card__label">Active Room</div>
+                <div class="rejoin-card__code">{{.RejoinCode}}</div>
+                <a href="/room/{{.RejoinCode}}" class="btn-primary" style="font-size:1.1rem; padding:0.4rem 1.8rem;">Rejoin Room</a>
+                <form method="post" action="/room/leave">
+                    <button type="button" class="btn-ghost" onclick="this.closest('form').submit()">Leave &amp; start fresh</button>
                 </form>
-
-                <div class="text-white text-center text-lg font-bold">— or —</div>
-
-                <form method="post" action="/rooms/join" class="flex flex-col items-center gap-3">
-                    <input name="code" type="text" required placeholder="ROOM CODE" maxlength="4"
-                        style="text-transform:uppercase; letter-spacing:0.3em;" />
-                    <button type="submit" class="join" style="font-size:1.2rem; padding:0.4rem 1.5rem;">Join Room</button>
-                </form>
-
-                {{if .}}{{if .Error}}
-                <div class="bg-red-500 text-white p-2 rounded-lg text-sm">{{.Error}}</div>
-                {{end}}{{end}}
             </div>
-        </div>
-        <div class="flex-1"></div>
-    </div>
+            <div class="home-divider">— or start a new game —</div>
+            {{end}}{{end}}
 
-    <div class="gradient-overlay"></div>
-    <div class="parallax-container">
-        <div class="parallax-layer stars"></div>
-        <div class="parallax-layer cloud-1">
-            <img src="/static/cloud-1.svg" />
-            <img src="/static/cloud-1.svg" />
-        </div>
-        <div class="parallax-layer cloud-2">
-            <img src="/static/cloud-2.svg" />
-            <img src="/static/cloud-2.svg" />
+            <form method="post" action="/rooms/create">
+                <button type="submit">Create Room</button>
+            </form>
+
+            <div class="home-divider">— or —</div>
+
+            <form method="post" action="/rooms/join" class="home-panel">
+                <input name="code" type="text" required placeholder="ROOM CODE" maxlength="4"
+                    style="text-transform:uppercase; letter-spacing:0.3em;" />
+                <button type="submit">Join Room</button>
+            </form>
+
+            {{if .}}{{if .Error}}
+            <div class="error-msg">{{.Error}}</div>
+            {{end}}{{end}}
         </div>
     </div>
-    <div class="hills"></div>
 </body>
 
 </html>

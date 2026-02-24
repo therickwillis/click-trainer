@@ -3,59 +3,50 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Click Trainer - Game Recap</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="icon" href="/static/favicon.ico">
 </head>
-<body data-scene="recap" class="overflow-auto">
-    <div class="gradient-overlay"></div>
-    <div class="parallax-container">
-        <div class="parallax-layer stars"></div>
-        <div class="parallax-layer cloud-1">
-            <img src="/static/cloud-1.svg" />
-            <img src="/static/cloud-1.svg" />
-        </div>
-        <div class="parallax-layer cloud-2">
-            <img src="/static/cloud-2.svg" />
-            <img src="/static/cloud-2.svg" />
-        </div>
-    </div>
-    <div class="hills"></div>
-    <div class="relative z-10 p-8 max-w-4xl mx-auto">
-        <a href="/analytics" class="text-white underline mb-6 inline-block">&larr; Back to Analytics</a>
+<body data-scene="recap" class="page-scrollable">
+    <div class="scene-bg"></div>
+    <div class="analytics-container">
+        <a href="/analytics" class="analytics-back-link">&larr; Back to Analytics</a>
 
-        <div class="bg-white rounded-lg p-6 mb-6">
-            <h1 class="text-3xl font-bold mb-2">Game Recap</h1>
-            <div class="text-gray-500 mb-4">Room: {{.RoomCode}}</div>
+        <div class="analytics-card">
+            <h1 style="text-align:left; font-size:2rem; -webkit-text-stroke:0; text-shadow:none; color:#1a1a2e; margin-bottom:0.25rem;">Game Recap</h1>
+            <div style="color:#6b7280; font-size:0.95rem; font-weight:600;">Room: {{.RoomCode}}</div>
         </div>
 
         {{range .Players}}
-        <div class="bg-white rounded-lg p-4 mb-4">
-            <div class="flex items-center gap-4 mb-3">
-                <span class="text-lg font-bold" style="color:{{.PlayerColor}}">{{.PlayerName}}</span>
-                <span class="text-lg font-bold">{{.Score}} pts</span>
+        <div class="analytics-card">
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <span style="font-size:1.2rem; font-weight:900; color:{{.PlayerColor}};">{{.PlayerName}}</span>
+                <span style="font-size:1.2rem; font-weight:900; color:#1a1a2e;">{{.Score}} pts</span>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-center text-sm">
+            <div class="analytics-player-game" style="margin-top:0.75rem;">
                 <div>
-                    <div class="font-bold">{{.Clicks}}</div>
-                    <div class="text-gray-500">Clicks</div>
+                    <div class="analytics-player-game__value">{{.Clicks}}</div>
+                    <div class="analytics-player-game__label">Clicks</div>
                 </div>
                 <div>
-                    <div class="font-bold">{{printf "%.0f" .AvgReaction}}ms</div>
-                    <div class="text-gray-500">Avg Reaction</div>
+                    <div class="analytics-player-game__value">{{printf "%.0f" .AvgReaction}}ms</div>
+                    <div class="analytics-player-game__label">Avg Reaction</div>
                 </div>
                 <div>
-                    <div class="font-bold">{{.BestReaction}}ms</div>
-                    <div class="text-gray-500">Best Reaction</div>
+                    <div class="analytics-player-game__value">{{.BestReaction}}ms</div>
+                    <div class="analytics-player-game__label">Best Reaction</div>
                 </div>
                 <div>
-                    <div class="font-bold">{{printf "%.1f" .CPS}}</div>
-                    <div class="text-gray-500">CPS</div>
+                    <div class="analytics-player-game__value">{{printf "%.1f" .CPS}}</div>
+                    <div class="analytics-player-game__label">CPS</div>
                 </div>
                 <div>
-                    <div class="font-bold">{{printf "%.0f" .BullseyeRate}}%</div>
-                    <div class="text-gray-500">Bullseye Rate</div>
+                    <div class="analytics-player-game__value">{{printf "%.0f" .BullseyeRate}}%</div>
+                    <div class="analytics-player-game__label">Bullseye Rate</div>
                 </div>
             </div>
         </div>

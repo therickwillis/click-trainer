@@ -4,32 +4,30 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Click Trainer - Target Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="icon" href="/static/favicon.ico">
+    <!-- Compute initial game scale before render to avoid layout flash -->
+    <script>
+    (function() {
+        var scale = Math.min(window.innerWidth * 0.97 / 600, window.innerHeight * 0.97 / 400);
+        document.documentElement.style.setProperty('--game-scale', scale);
+    })();
+    </script>
 </head>
 
 <body hx-ext="sse" sse-connect="/room/events" data-scene="{{.Scene}}">
-    <div class="gradient-overlay"></div>
-    <div class="parallax-container">
-        <div class="parallax-layer stars"></div>
-        <div class="parallax-layer cloud-1">
-            <img src="/static/cloud-1.svg" />
-            <img src="/static/cloud-1.svg" />
-        </div>
-        <div class="parallax-layer cloud-2">
-            <img src="/static/cloud-2.svg" />
-            <img src="/static/cloud-2.svg" />
-        </div>
-    </div>
-    <div class="hills"></div>
-    <div class="p-4 h-screen relative" style="z-index:10;">
-        <div id="scene"
-            class="relative h-full flex flex-col justify-center items-center md:scale-130 lg:scale-160 xl:scale-180 2xl:scale-200 3xl:scale-230 4xl:scale-260">
+    <div class="scene-bg"></div>
+
+    <div class="game-layout">
+        <div class="game-scene" id="scene">
             {{if eq .Scene "lobby"}}
             {{template "lobby" .}}
             {{else if eq .Scene "recap"}}
@@ -39,15 +37,14 @@
             {{end}}
         </div>
     </div>
+
     <div sse-swap="swap" hx-swap="true"></div>
     <div sse-swap="sceneChange" style="display:none;" hx-on:htmx:after-swap="document.body.setAttribute('data-scene', this.textContent)"></div>
     <div id="game-content-conn" hx-trigger="sse:update" hx-get="/room/poll" hx-target="#game-content" hx-swap="innerHTML">
     </div>
 
     <!-- Mute button -->
-    <button type="button" id="mute-btn" onclick="toggleMuteBtn()"
-        class="fixed top-4 right-4 z-50 bg-black/40 hover:bg-black/60 text-white rounded-full w-10 h-10 flex items-center justify-center cursor-pointer"
-        title="Toggle sound">
+    <button type="button" id="mute-btn" onclick="toggleMuteBtn()" class="mute-btn" title="Toggle sound">
         <span id="mute-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -58,6 +55,15 @@
     </button>
 
     <script>
+    // ===== Game scale — responsive scaling =====
+    function updateGameScale() {
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var scale = Math.min((vw * 0.97) / 600, (vh * 0.97) / 400);
+        document.documentElement.style.setProperty('--game-scale', scale);
+    }
+    updateGameScale();
+    window.addEventListener('resize', updateGameScale);
+
     // ===== QR Code & Sharing =====
     function generateQR() {
         var container = document.getElementById('qr-code');
@@ -458,16 +464,12 @@
 {{end}}
 
 {{define "gameContent"}}
-
-    <div class="flex flex-row items-center gap-4 w-full justify-center">
+    <div class="game-hud">
         {{template "scoreboard" .Players}}
-        <div id="timer" class="bg-black/40 text-white rounded-lg p-1 px-2 text-sm font-bold tabular-nums tracking-wider">{{.TimeLeft}}</div>
-        <button type="button" hx-post="/room/leave" hx-swap="none"
-            class="text-white/30 hover:text-white/70 text-xs underline cursor-pointer bg-transparent border-none ml-2 transition-colors">
-            Leave
-        </button>
+        <div id="timer" class="game-timer">{{.TimeLeft}}</div>
+        <button type="button" hx-post="/room/leave" hx-swap="none" class="btn-ghost">Leave</button>
     </div>
-    <div id="game-area" class="relative">
+    <div id="game-area">
         <div id="targets">
             {{range .Targets}}
             {{template "target" .}}
@@ -475,16 +477,15 @@
             <div sse-swap="newTarget" hx-swap="beforebegin"></div>
         </div>
     </div>
-
 {{end}}
 
 {{define "scoreboard"}}
-<div id="scoreboard" sse-swap="scoreboard" hx-swap="outerHTML" class="flex flex-row flex-wrap gap-2 p-1 text-sm">
+<div id="scoreboard" class="scoreboard" sse-swap="scoreboard" hx-swap="outerHTML">
     {{range .}}
-    <div id="player_{{.ID}}" class="flex flex-row items-center gap-2 px-3 py-1.5 rounded-lg" style="background-color:{{.Color}}33; border: 2px solid {{.Color}};">
-        <div class="w-3 h-3 rounded-full" style="background-color:{{.Color}}"></div>
-        <label class="text-white font-bold">{{ .Name }}</label>
-        <div id="player_score_{{ .ID }}" class="bg-white/20 px-2 py-0.5 rounded-md text-white">{{ .Score}}</div>
+    <div id="player_{{.ID}}" class="player-chip" style="--chip-color: {{.Color}}">
+        <span class="player-chip__dot"></span>
+        <span class="player-chip__name">{{ .Name }}</span>
+        <span class="player-chip__score" id="player_score_{{.ID}}">{{ .Score }}</span>
     </div>
     {{end}}
 </div>

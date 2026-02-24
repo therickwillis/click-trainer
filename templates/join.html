@@ -3,48 +3,30 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Join the Game</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="icon" href="/static/favicon.ico">
 </head>
 
-<body data-scene="join" class="bg-gray-200">
+<body data-scene="join">
+    <div class="scene-bg"></div>
     <form method="post" action="/room/register" class="form-overlay">
-        <div id="join" class="flex flex-row h-screen">
-            <div class="flex-1"></div>
-            <div class="flex-1 content-center">
-                <div class="flex flex-col justify-center items-center">
-                    <h1 class="join">JOIN</h1>
-                    {{if .}}{{if .RoomCode}}
-                    <div class="text-white text-lg font-bold mb-2">Room: {{.RoomCode}}</div>
-                    {{end}}{{end}}
-                    <div>
-                        <input name="name" type="text" required placeholder="Your Name Here..." />
-                    </div>
-                    <div>
-                        <button type="submit" class="join">Start</button>
-                    </div>
-                </div>
+        <div class="page-layout">
+            <div class="page-content">
+                <h1>JOIN</h1>
+                {{if .}}{{if .RoomCode}}
+                <div style="color: rgba(255,255,255,0.8); font-size: 1.1rem; font-weight: 700; text-align:center;">Room: {{.RoomCode}}</div>
+                {{end}}{{end}}
+                <input name="name" type="text" required placeholder="Your Name Here..." />
+                <button type="submit">Start</button>
             </div>
-            <div class="flex-1"></div>
         </div>
     </form>
-
-    <div class="gradient-overlay"></div>
-    <div class="parallax-container">
-        <div class="parallax-layer stars">
-        </div>
-        <div class="parallax-layer cloud-1">
-            <img src="/static/cloud-1.svg" />
-            <img src="/static/cloud-1.svg" />
-        </div>
-        <div class="parallax-layer cloud-2">
-            <img src="/static/cloud-2.svg" />
-            <img src="/static/cloud-2.svg" />
-        </div>
-    </div>
-    <div class="hills"></div>
 </body>
 
 </html>

@@ -1,24 +1,17 @@
 {{define "recap"}}
-<div id="recap" class="w-md text-center">
-    <h1 class="text-white mb-4">Game Over!</h1>
-    <div class="flex flex-col gap-2 mb-6">
+<div id="recap" class="recap-panel">
+    <h1>Game Over!</h1>
+    <div class="recap-ranking">
         {{range $i, $p := .}}
-        <div class="flex flex-row bg-white/20 backdrop-blur-sm rounded-lg p-3 items-center gap-2 text-white">
-            <div class="text-lg font-bold w-8">{{inc $i}}</div>
-            <div class="w-3 h-3 rounded-full" style="background-color:{{$p.Color}}"></div>
-            <div class="grow text-left font-bold">{{$p.Name}}</div>
-            <div class="text-lg font-bold">{{$p.Score}} pts</div>
+        <div class="recap-row">
+            <div class="recap-row__rank">{{inc $i}}</div>
+            <div class="recap-row__dot" style="background-color:{{$p.Color}}"></div>
+            <div class="recap-row__name">{{$p.Name}}</div>
+            <div class="recap-row__score">{{$p.Score}} pts</div>
         </div>
         {{end}}
     </div>
-    <button type="submit" hx-post="/room/play-again" hx-swap="none">
-        Play Again
-    </button>
-    <div class="mt-3">
-        <button type="button" hx-post="/room/leave" hx-swap="none"
-            class="text-white/50 hover:text-white/80 text-sm underline cursor-pointer bg-transparent border-none">
-            Leave Room
-        </button>
-    </div>
+    <button type="submit" hx-post="/room/play-again" hx-swap="none">Play Again</button>
+    <button type="button" hx-post="/room/leave" hx-swap="none" class="btn-ghost">Leave Room</button>
 </div>
 {{end}}
