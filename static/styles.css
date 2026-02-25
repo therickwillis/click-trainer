@@ -303,7 +303,7 @@
     display: grid;
     place-items: center;
     z-index: 10;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   /* Scaled container — desktop scales everything together */
@@ -356,8 +356,9 @@
       margin: auto;
       width: var(--game-width);
       height: var(--game-height);
-      transform: scale(var(--game-scale));
-      transform-origin: center;
+      touch-action: none;
+      transform-origin: center center;
+      transform: rotate(calc(var(--game-rotate, 0) * -90deg)) scale(var(--game-scale));
     }
   }
 
@@ -401,11 +402,10 @@
   /* ---- Scoreboard / Player chips ---- */
   .scoreboard {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.4rem;
-    justify-content: center;
-    max-height: 5rem;
-    overflow-y: auto;
+    align-items: center;
+    overflow: hidden;
     flex: 1;
     min-width: 0;
   }
@@ -440,10 +440,7 @@
 
   @media (max-width: 767px) {
     .scoreboard {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      overflow-y: hidden;
-      max-height: none;
+      overflow: hidden;
       justify-content: flex-start;
     }
 

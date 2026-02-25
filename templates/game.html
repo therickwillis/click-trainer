@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>Click Trainer - Target Game</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +17,24 @@
     <!-- Compute initial game scale before render to avoid layout flash -->
     <script>
     (function() {
-        var scale = Math.min(window.innerWidth * 0.97 / 600, window.innerHeight * 0.97 / 400);
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var isMobile = vw <= 767;
+        var isPortrait = vw < vh;
+        var scale, rotate;
+        if (!isMobile) {
+            // HUD (~46px) is inside scaled .game-scene; total native height ~446px
+            scale = Math.min(vw * 0.97 / 600, vh * 0.97 / 446);
+            rotate = 0;
+        } else if (isPortrait) {
+            // Rotated game: 600x400 -> visually 400 wide x 600 tall
+            scale = Math.min(vw * 0.97 / 400, vh * 0.85 / 600);
+            rotate = 1;
+        } else {
+            scale = Math.min(vw * 0.97 / 600, vh * 0.85 / 400);
+            rotate = 0;
+        }
         document.documentElement.style.setProperty('--game-scale', scale);
+        document.documentElement.style.setProperty('--game-rotate', rotate);
     })();
     </script>
 </head>
@@ -58,11 +74,34 @@
     // ===== Game scale — responsive scaling =====
     function updateGameScale() {
         var vw = window.innerWidth, vh = window.innerHeight;
-        var scale = Math.min((vw * 0.97) / 600, (vh * 0.97) / 400);
+        var isMobile = vw <= 767;
+        var isPortrait = vw < vh;
+        var hud = document.querySelector('.game-hud');
+        var hudH = (isMobile && hud) ? hud.getBoundingClientRect().height : 0;
+        var scale, rotate;
+
+        if (!isMobile) {
+            // Desktop: HUD included in scaled scene; native total ~446px
+            scale = Math.min(vw * 0.97 / 600, vh * 0.97 / 446);
+            rotate = 0;
+        } else if (isPortrait) {
+            // Portrait: rotate -90deg, game fits as 400x600 in viewport
+            scale = Math.min(vw * 0.97 / 400, (vh - hudH) * 0.97 / 600);
+            rotate = 1;
+        } else {
+            // Landscape mobile
+            scale = Math.min(vw * 0.97 / 600, (vh - hudH) * 0.97 / 400);
+            rotate = 0;
+        }
+
         document.documentElement.style.setProperty('--game-scale', scale);
+        document.documentElement.style.setProperty('--game-rotate', rotate);
     }
     updateGameScale();
     window.addEventListener('resize', updateGameScale);
+    window.addEventListener('orientationchange', function() {
+        setTimeout(updateGameScale, 100);
+    });
 
     // ===== QR Code & Sharing =====
     function generateQR() {
@@ -290,6 +329,40 @@
 
         if (window.SoundEngine) SoundEngine.playHit(points);
     });
+
+    // ===== Touch event handler for mobile target taps =====
+    document.addEventListener('touchstart', function(e) {
+        var touch = e.changedTouches[0];
+        var el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (!el) return;
+        var circle = el.closest('circle[data-points]');
+        if (!circle) return;
+
+        e.preventDefault(); // block synthesised mouse event
+
+        var points = parseInt(circle.getAttribute('data-points'), 10);
+        if (!points) return;
+        var targetDiv = circle.closest('[data-target-id]');
+        if (!targetDiv) return;
+        var targetId = parseInt(targetDiv.getAttribute('data-target-id'), 10);
+
+        if (!window.GameWS || !window.GameWS.sendClick(targetId, points)) {
+            fetch('/room/target/' + targetId + '/' + points, {method: 'POST', credentials: 'same-origin'});
+        }
+
+        var gameArea = document.getElementById('game-area');
+        if (!gameArea) return;
+
+        // Map viewport touch coords -> game element coords
+        var rect = gameArea.getBoundingClientRect();
+        var x = (touch.clientX - rect.left) * (gameArea.offsetWidth / rect.width);
+        var y = (touch.clientY - rect.top) * (gameArea.offsetHeight / rect.height);
+
+        spawnPointsPopup(gameArea, x, y, points);
+        triggerScreenShake(gameArea);
+        spawnBurstParticles(gameArea, x, y);
+        if (window.SoundEngine) SoundEngine.playHit(points);
+    }, {passive: false});
 
     function spawnPointsPopup(container, x, y, points) {
         var el = document.createElement('div');

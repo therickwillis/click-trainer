@@ -83,7 +83,8 @@
       "Bash(claude --version 2>/dev/null || echo \"not found\")",
       "Bash(claude plugin install frontend-design 2>&1)",
       "Bash(claude plugin list; echo \"exit: $?\")",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(python3:*)"
     ]
   }
 }

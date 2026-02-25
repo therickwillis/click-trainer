@@ -66,7 +66,7 @@ func (g *Game) Get(id string) GameData {
 	return GameData{
 		Scene:    g.scene,
 		Player:   g.Players.Get(id),
-		Players:  g.Players.GetList(),
+		Players:  g.Players.GetTopPlayers(5),
 		Targets:  g.Targets.GetList(),
 		TimeLeft: g.timeLeft,
 	}

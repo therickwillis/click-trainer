@@ -2,6 +2,7 @@ package players
 
 import (
 	"clicktrainer/internal/utility"
+	"sort"
 	"sync"
 )
 
@@ -38,6 +39,22 @@ func (s *Store) GetList() []*Player {
 		playerList = append(playerList, p)
 	}
 	return playerList
+}
+
+func (s *Store) GetTopPlayers(n int) []*Player {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	list := make([]*Player, 0, len(s.players))
+	for _, p := range s.players {
+		list = append(list, p)
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Score > list[j].Score
+	})
+	if len(list) > n {
+		list = list[:n]
+	}
+	return list
 }
 
 func (s *Store) UpdateScore(id string, points int) *Player {

@@ -53,7 +53,8 @@ def random_suffix(n: int = 3) -> str:
 
 
 def build_cmd(server: str, room_code: str | None, name: str, skill: str,
-              rounds: int, verbose: bool) -> list[str]:
+              rounds: int, verbose: bool, screenshots: bool = False,
+              screenshot_prefix: str | None = None) -> list[str]:
     cmd = [
         sys.executable, BOT_SCRIPT,
         "--server", server,
@@ -65,6 +66,10 @@ def build_cmd(server: str, room_code: str | None, name: str, skill: str,
         cmd += ["--room-code", room_code]
     if verbose:
         cmd.append("--verbose")
+    if screenshots:
+        cmd.append("--screenshots")
+    if screenshot_prefix:
+        cmd += ["--screenshot-prefix", screenshot_prefix]
     return cmd
 
 
@@ -177,6 +182,10 @@ def parse_args():
     p.add_argument("--stagger-ms", type=int, default=800,
                    help="Ms between launching each follower bot (default 800)")
     p.add_argument("--verbose", action="store_true")
+    p.add_argument("--screenshots", action="store_true",
+                   help="Capture desktop + portrait screenshots (passed to bot 0 only)")
+    p.add_argument("--screenshot-prefix", default=None,
+                   help="Filename prefix for screenshots (default: auto)")
     return p.parse_args()
 
 
@@ -213,7 +222,11 @@ def main():
     # Launch threads — bot 0 first, followers staggered
     threads: list[threading.Thread] = []
     for i, (name, skill) in enumerate(zip(names, skills)):
-        cmd = build_cmd(args.server, args.room_code, name, skill, args.rounds, args.verbose)
+        # Only bot 0 takes screenshots (it creates the room and sees all phases)
+        take_shots = args.screenshots and i == 0
+        cmd = build_cmd(args.server, args.room_code, name, skill, args.rounds,
+                        args.verbose, screenshots=take_shots,
+                        screenshot_prefix=args.screenshot_prefix)
         t = threading.Thread(
             target=run_bot,
             args=(i, name, cmd, out_q, room_code_ready, room_code_box, args.verbose),

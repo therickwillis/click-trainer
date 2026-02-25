@@ -15,6 +15,9 @@ Options:
   --max-cps F         Override max clicks per second
   --rounds N          Play N rounds then exit (default: 1)
   --verbose           Print debug info (snapshot dumps, timing)
+  --screenshots       Capture desktop + portrait screenshots at key phases
+  --screenshot-prefix PREFIX
+                      Filename prefix (default: derived from bot name + timestamp)
 """
 
 import argparse
@@ -26,7 +29,7 @@ import string
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -56,6 +59,8 @@ class BotConfig:
     rounds: int = 1
     verbose: bool = False
     session: str = ""
+    screenshots: bool = False
+    screenshot_prefix: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -85,11 +90,16 @@ class PlaywrightSession:
         return self.run("click", ref)
 
     def fill(self, ref: str, value: str) -> str:
-        # Pass value directly — no shell quoting needed since we use subprocess list
         return self.run("fill", ref, value)
 
     def close(self) -> str:
         return self.run("close")
+
+    def screenshot(self, name: str) -> str:
+        """Take screenshot into screenshots/{name}. Returns the full path."""
+        path = f"screenshots/{name}"
+        self.run("screenshot", f"--filename={path}", timeout=10)
+        return path
 
     def eval(self, js: str) -> str:
         """Run JS via playwright-cli eval and return the result string.
@@ -200,6 +210,111 @@ JS_GET_RECAP = (
     ")"
 )
 
+# Simulate a 393×852 portrait viewport on the existing 1280×720 browser window.
+# Directly applies mobile CSS rules (skipped because media query won't fire at 1280px),
+# forces the game rotation, and adds an orange frame label so the sim is obvious.
+JS_INJECT_PORTRAIT_SIM = (
+    "() => {"
+    # Portrait dimensions and derived scale (400-wide × 600-tall after -90° rotate)
+    "  var PW=393, PH=852, HUD_H=46;"
+    "  var scale = Math.min(PW*0.97/400, (PH-HUD_H)*0.97/600);"
+    "  var root = document.documentElement;"
+    "  root.style.setProperty('--game-scale', scale);"
+    "  root.style.setProperty('--game-rotate', 1);"
+    # CRITICAL: .game-scene has transform:scale(...) from CSS which (a) double-scales
+    # the game-area and (b) traps position:fixed children, preventing HUD from escaping
+    # to the viewport top. Override with 'none' to fix both issues.
+    "  var scene = document.querySelector('.game-scene');"
+    "  if (scene) scene.style.transform = 'none';"
+    # Apply mobile #game-area styles directly (media query doesn't fire at 1280px)
+    "  var ga = document.getElementById('game-area');"
+    "  if (ga) {"
+    "    ga.style.position='fixed';"
+    "    ga.style.inset='0';"
+    "    ga.style.margin='auto';"
+    "    ga.style.width='600px';"
+    "    ga.style.height='400px';"
+    "    ga.style.transformOrigin='center center';"
+    "    ga.style.transform='rotate(-90deg) scale('+scale+')';"
+    "  }"
+    # Apply mobile HUD styles
+    "  var hud = document.querySelector('.game-hud');"
+    "  if (hud) {"
+    "    hud.style.position='fixed';"
+    "    hud.style.top='0';"
+    "    hud.style.left='0';"
+    "    hud.style.right='0';"
+    "    hud.style.zIndex='100';"
+    "    hud.style.backdropFilter='blur(10px)';"
+    "    hud.style.background='rgba(0,0,0,0.6)';"
+    "    hud.style.padding='0.4rem 0.75rem';"
+    "    hud.style.width='auto';"
+    "  }"
+    # Hide chip names (mobile behavior)
+    "  document.querySelectorAll('.player-chip__name').forEach(function(el){"
+    "    el.setAttribute('data-portrait-hidden','1');"
+    "    el.style.display='none';"
+    "  });"
+    # Phone-frame overlay with label
+    "  if (!document.getElementById('__portrait_frame__')) {"
+    "    var frame = document.createElement('div');"
+    "    frame.id = '__portrait_frame__';"
+    "    frame.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;"
+    "      box-shadow:inset 0 0 0 5px rgba(255,120,0,0.85);border-radius:16px';"
+    "    var label = document.createElement('div');"
+    "    label.style.cssText = 'position:absolute;bottom:8px;right:10px;"
+    "      font:700 11px monospace;color:rgba(255,150,0,1);"
+    "      background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;"
+    "      letter-spacing:0.05em';"
+    "    label.textContent = 'portrait sim 393\u00d7852';"
+    "    frame.appendChild(label);"
+    "    document.body.appendChild(frame);"
+    "  }"
+    "}"
+)
+
+# Undo the portrait simulation and restore desktop layout.
+JS_RESTORE_DESKTOP = (
+    "() => {"
+    "  var vw=window.innerWidth, vh=window.innerHeight;"
+    "  var scale = Math.min(vw*0.97/600, vh*0.97/446);"
+    "  var root = document.documentElement;"
+    "  root.style.setProperty('--game-scale', scale);"
+    "  root.style.setProperty('--game-rotate', 0);"
+    # Restore game-scene transform (CSS will re-apply scale via --game-scale)
+    "  var scene = document.querySelector('.game-scene');"
+    "  if (scene) scene.style.transform = '';"
+    "  var ga = document.getElementById('game-area');"
+    "  if (ga) {"
+    "    ga.style.position='';"
+    "    ga.style.inset='';"
+    "    ga.style.margin='';"
+    "    ga.style.width='';"
+    "    ga.style.height='';"
+    "    ga.style.transformOrigin='';"
+    "    ga.style.transform='';"
+    "  }"
+    "  var hud = document.querySelector('.game-hud');"
+    "  if (hud) {"
+    "    hud.style.position='';"
+    "    hud.style.top='';"
+    "    hud.style.left='';"
+    "    hud.style.right='';"
+    "    hud.style.zIndex='';"
+    "    hud.style.backdropFilter='';"
+    "    hud.style.background='';"
+    "    hud.style.padding='';"
+    "    hud.style.width='';"
+    "  }"
+    "  document.querySelectorAll('[data-portrait-hidden]').forEach(function(el){"
+    "    el.style.display='';"
+    "    el.removeAttribute('data-portrait-hidden');"
+    "  });"
+    "  var frame=document.getElementById('__portrait_frame__');"
+    "  if (frame) frame.remove();"
+    "}"
+)
+
 
 def js_click_target(target_id: int, points: int) -> str:
     """Build JS that dispatches mousedown on the right circle of a target."""
@@ -229,6 +344,62 @@ class BotPlayer:
         self.score: int = 0
         self._last_click_time: float = 0.0
         self._clicked_targets: set[int] = set()
+        self._screenshots_taken: list[str] = []
+
+    # ------------------------------------------------------------------
+    # Screenshot helpers
+    # ------------------------------------------------------------------
+
+    def _take_phase_screenshots(self, phase: str, wait_s: float = 0.0):
+        """Capture desktop + portrait-sim screenshots for a named game phase.
+
+        Files land in screenshots/ as:
+          {prefix}_{phase}_desktop.png
+          {prefix}_{phase}_portrait_sim.png
+        """
+        if not self.cfg.screenshots:
+            return
+
+        if wait_s > 0:
+            time.sleep(wait_s)
+
+        prefix = self.cfg.screenshot_prefix
+
+        # --- Desktop (1280×720 landscape) ---
+        desktop_name = f"{prefix}_{phase}_desktop.png"
+        desktop_path = self.pw.screenshot(desktop_name)
+        self._screenshots_taken.append(desktop_path)
+        emit({
+            "event": "screenshot",
+            "phase": phase,
+            "viewport": "desktop_1280x720",
+            "file": desktop_path,
+        })
+
+        # --- Portrait simulation (393×852 mobile) ---
+        self.pw.eval(JS_INJECT_PORTRAIT_SIM)
+        time.sleep(0.25)  # allow repaint after CSS injection
+        portrait_name = f"{prefix}_{phase}_portrait_sim.png"
+        portrait_path = self.pw.screenshot(portrait_name)
+        self._screenshots_taken.append(portrait_path)
+        emit({
+            "event": "screenshot",
+            "phase": phase,
+            "viewport": "portrait_sim_393x852",
+            "file": portrait_path,
+        })
+
+        # Restore desktop layout for continued interaction
+        self.pw.eval(JS_RESTORE_DESKTOP)
+
+    def print_screenshot_summary(self):
+        """Print a human-readable list of all screenshots taken."""
+        if not self._screenshots_taken:
+            return
+        print("\n--- Screenshots ---", file=sys.stderr)
+        for path in self._screenshots_taken:
+            print(f"  {path}", file=sys.stderr)
+        print(f"  ({len(self._screenshots_taken)} files in screenshots/)", file=sys.stderr)
 
     # ------------------------------------------------------------------
     # Phase: navigate
@@ -302,7 +473,6 @@ class BotPlayer:
         name_ref = find_ref(refs, "textbox")
         if not name_ref:
             raise RuntimeError("Cannot find name input on join page")
-        # Pass name directly — no shell quoting wrapping needed
         self.pw.fill(name_ref, self.cfg.name)
         time.sleep(0.3)
 
@@ -341,6 +511,9 @@ class BotPlayer:
     # ------------------------------------------------------------------
 
     def lobby_ready(self):
+        # Screenshot the lobby before readying up
+        self._take_phase_screenshots("lobby")
+
         for _ in range(30):
             refs = self.pw.snapshot_refs()
             ready_ref = find_ref(refs, "Ready") or find_ref(refs, "ready")
@@ -371,9 +544,17 @@ class BotPlayer:
 
     def combat(self):
         emit({"event": "combat_start", "ts": int(time.time())})
+
+        # Screenshot once targets have had a moment to appear
+        self._take_phase_screenshots("combat", wait_s=1.0)
+
         self._clicked_targets.clear()
         # Poll interval based on reaction time — targets need to be noticed quickly
         poll_interval = max(0.05, (self.cfg.reaction_ms / 4) / 1000.0)
+
+        # Track mid-combat screenshot (taken after first few clicks)
+        _mid_shot_taken = False
+        _clicks_for_mid_shot = 3
 
         while True:
             time.sleep(poll_interval)
@@ -436,6 +617,11 @@ class BotPlayer:
                         "reaction_ms": int(delay * 1000),
                         "cumulative_score": self.score,
                     })
+
+                    # Mid-combat screenshot: capture live game state with score on board
+                    if not _mid_shot_taken and len(self._clicked_targets) >= _clicks_for_mid_shot:
+                        _mid_shot_taken = True
+                        self._take_phase_screenshots("combat_active", wait_s=0.2)
                 else:
                     # Target disappeared before we could click (already claimed or expired)
                     emit({"event": "miss", "ts": int(time.time()), "target_id": tid, "reason": result})
@@ -457,6 +643,9 @@ class BotPlayer:
     # ------------------------------------------------------------------
 
     def read_recap(self) -> list[dict]:
+        # Screenshot the recap screen
+        self._take_phase_screenshots("recap", wait_s=0.5)
+
         raw = self.pw.eval(JS_GET_RECAP).strip()
         try:
             result = json.loads(raw) if raw and raw not in ("null", "") else []
@@ -503,6 +692,10 @@ def parse_args() -> BotConfig:
     parser.add_argument("--max-cps", type=float, default=None)
     parser.add_argument("--rounds", type=int, default=1)
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--screenshots", action="store_true",
+                        help="Capture desktop + portrait screenshots at key phases")
+    parser.add_argument("--screenshot-prefix", default=None,
+                        help="Filename prefix for screenshots (default: botname_timestamp)")
     args = parser.parse_args()
 
     preset = SKILL_PRESETS[args.skill]
@@ -517,11 +710,19 @@ def parse_args() -> BotConfig:
         max_cps=args.max_cps if args.max_cps is not None else preset["max_cps"],
         rounds=args.rounds,
         verbose=args.verbose,
+        screenshots=args.screenshots,
     )
 
     suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
     cfg.name = args.name or f"Bot-{suffix}"
     cfg.session = f"bot-{cfg.name.lower().replace(' ', '-')}-{suffix}"
+
+    if args.screenshot_prefix:
+        cfg.screenshot_prefix = args.screenshot_prefix
+    else:
+        ts = int(time.time())
+        safe_name = re.sub(r'[^a-z0-9]+', '_', cfg.name.lower())
+        cfg.screenshot_prefix = f"{safe_name}_{ts}"
 
     return cfg
 
@@ -529,6 +730,10 @@ def parse_args() -> BotConfig:
 def main():
     cfg = parse_args()
     bot = BotPlayer(cfg)
+
+    if cfg.screenshots:
+        os.makedirs("screenshots", exist_ok=True)
+        print(f"[screenshots] enabled — prefix: {cfg.screenshot_prefix}", file=sys.stderr)
 
     try:
         bot.navigate()
@@ -578,6 +783,7 @@ def main():
         sys.exit(1)
     finally:
         bot.cleanup()
+        bot.print_screenshot_summary()
 
 
 if __name__ == "__main__":

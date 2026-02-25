@@ -191,7 +191,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		room.Broadcaster.BroadcastOOB("newPlayer", buf.String())
 	default:
 		var buf bytes.Buffer
-		if err := s.Tmpl.ExecuteTemplate(&buf, "scoreboard", room.Game.Players.GetList()); err != nil {
+		if err := s.Tmpl.ExecuteTemplate(&buf, "scoreboard", room.Game.Players.GetTopPlayers(5)); err != nil {
 			log.Println(err)
 		}
 		room.Broadcaster.BroadcastOOB("scoreboard", buf.String())
