@@ -539,6 +539,14 @@
 {{define "gameContent"}}
     <div class="game-hud">
         {{template "scoreboard" .Players}}
+        {{if .Player}}
+        <div class="my-rank-chip" style="--chip-color: {{.Player.Color}}">
+            <span class="my-rank-chip__dot"></span>
+            <span class="my-rank-chip__label">You</span>
+            <span id="my_rank_pos_{{.Player.ID}}" class="my-rank-chip__pos">#{{.PlayerRank}}</span>
+            <span id="my_rank_score_{{.Player.ID}}" class="my-rank-chip__score">{{.Player.Score}}</span>
+        </div>
+        {{end}}
         <div id="timer" class="game-timer">{{.TimeLeft}}</div>
         <button type="button" hx-post="/room/leave" hx-swap="none" class="btn-ghost">Leave</button>
     </div>

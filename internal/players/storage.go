@@ -115,6 +115,24 @@ func (s *Store) Count() int {
 	return len(s.players)
 }
 
+func (s *Store) GetPlayerRank(id string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	list := make([]*Player, 0, len(s.players))
+	for _, p := range s.players {
+		list = append(list, p)
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Score > list[j].Score
+	})
+	for i, p := range list {
+		if p.ID == id {
+			return i + 1
+		}
+	}
+	return 0
+}
+
 func (s *Store) ResetAll() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -738,6 +738,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    /* Scrolling and responsive grid breakpoints are in the scalability section below */
   }
 
   .lobby-player {
@@ -849,6 +850,219 @@
   .recap-row__score {
     font-size: 1.1rem;
     font-weight: 900;
+  }
+
+  /* ---- "You" rank chip (combat HUD) ---- */
+  .my-rank-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--chip-color) 30%, transparent);
+    border: 2px solid var(--chip-color);
+    color: white;
+    font-weight: 700;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .my-rank-chip__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--chip-color);
+    flex-shrink: 0;
+  }
+
+  .my-rank-chip__label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    opacity: 0.75;
+    letter-spacing: 0.05em;
+  }
+
+  .my-rank-chip__pos {
+    font-weight: 900;
+    font-size: 0.85rem;
+  }
+
+  .my-rank-chip__score {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--r-sm);
+  }
+
+  @media (max-width: 767px) {
+    .my-rank-chip__label {
+      display: none;
+    }
+  }
+
+  /* ---- Lobby SSE anchor (always hidden) ---- */
+  .lobby-sse-anchor {
+    display: none;
+  }
+
+  /* ---- Lobby compact grid (CSS-only via :has()) ---- */
+  .lobby-players {
+    max-height: 40vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  /* 10+ players → 2-column grid, hide ready status */
+  .lobby-players:has(.lobby-player:nth-child(10)) {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.35rem;
+  }
+
+  .lobby-players:has(.lobby-player:nth-child(10)) .lobby-player {
+    padding: 0.4rem 0.6rem;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .lobby-players:has(.lobby-player:nth-child(10)) .lobby-player__ready {
+    display: none;
+  }
+
+  .lobby-players:has(.lobby-player:nth-child(10)) .lobby-player__dot {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  /* 20+ players → 3-column grid, smaller text */
+  .lobby-players:has(.lobby-player:nth-child(20)) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.25rem;
+  }
+
+  .lobby-players:has(.lobby-player:nth-child(20)) .lobby-player {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .lobby-players:has(.lobby-player:nth-child(20)) .lobby-player__name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 7rem;
+  }
+
+  /* ---- Recap podium (top 3) ---- */
+  .recap-podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding-bottom: 0.5rem;
+  }
+
+  .recap-podium__place {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1;
+    max-width: 110px;
+    background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+    border: 2px solid var(--chip-color);
+    border-radius: var(--r-md);
+    padding: 0.75rem 0.5rem;
+  }
+
+  .recap-podium__place--1 {
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .recap-podium__medal {
+    font-size: 1.5rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .recap-podium__place--1 .recap-podium__medal {
+    color: #ffd700;
+    text-shadow: 0 0 12px #ffd70099;
+  }
+
+  .recap-podium__place--2 .recap-podium__medal {
+    color: #c0c0c0;
+    text-shadow: 0 0 8px #c0c0c099;
+  }
+
+  .recap-podium__place--3 .recap-podium__medal {
+    color: #cd7f32;
+    text-shadow: 0 0 8px #cd7f3299;
+  }
+
+  .recap-podium__dot {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+  }
+
+  .recap-podium__name {
+    font-weight: 800;
+    font-size: 0.9rem;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .recap-podium__score {
+    font-size: 0.8rem;
+    font-weight: 700;
+    opacity: 0.85;
+  }
+
+  /* ---- Recap scrollable rest (ranks 4+) ---- */
+  .recap-rest {
+    width: 100%;
+    max-height: 30vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    scrollbar-width: thin;
+  }
+
+  .recap-rest__row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--surface-1);
+    border-radius: var(--r-sm);
+    padding: 0.45rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  .recap-rest__rank {
+    width: 2rem;
+    text-align: center;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .recap-rest__dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .recap-rest__name {
+    flex: 1;
+  }
+
+  .recap-rest__score {
+    font-weight: 900;
+    opacity: 0.85;
   }
 
   /* ---- Home / Join ---- */

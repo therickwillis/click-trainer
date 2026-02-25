@@ -30,13 +30,15 @@ func DefaultConfig() Config {
 }
 
 type GameData struct {
-	Scene    Scene
-	Player   *players.Player
-	Players  []*players.Player
-	Targets  []*targets.Target
-	TimeLeft int
-	Rankings []*players.Player
-	RoomCode string
+	Scene       Scene
+	Player      *players.Player
+	Players     []*players.Player
+	Targets     []*targets.Target
+	TimeLeft    int
+	Rankings    []*players.Player
+	RoomCode    string
+	PlayerCount int // total players (for conditional rendering)
+	PlayerRank  int // current player's 1-based rank (combat only)
 }
 
 type Game struct {
@@ -62,13 +64,31 @@ func NewGame(ps *players.Store, ts *targets.Store, bus *events.Bus, cfg Config) 
 
 func (g *Game) Get(id string) GameData {
 	g.mu.Lock()
-	defer g.mu.Unlock()
+	scene := g.scene
+	timeLeft := g.timeLeft
+	g.mu.Unlock()
+
+	count := g.Players.Count()
+	topN := 5
+	if count >= 10 {
+		topN = 3
+	}
+
+	var playerList []*players.Player
+	if scene == SceneLobby {
+		playerList = g.Players.GetList()
+	} else {
+		playerList = g.Players.GetTopPlayers(topN)
+	}
+
 	return GameData{
-		Scene:    g.scene,
-		Player:   g.Players.Get(id),
-		Players:  g.Players.GetTopPlayers(5),
-		Targets:  g.Targets.GetList(),
-		TimeLeft: g.timeLeft,
+		Scene:       scene,
+		Player:      g.Players.Get(id),
+		Players:     playerList,
+		Targets:     g.Targets.GetList(),
+		TimeLeft:    timeLeft,
+		PlayerCount: count,
+		PlayerRank:  g.Players.GetPlayerRank(id),
 	}
 }
 

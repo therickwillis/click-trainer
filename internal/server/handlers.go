@@ -174,27 +174,35 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		room.HostID = id
 	}
 
-	if s.DB != nil {
-		if err := s.DB.UpsertPlayer(id, name, player.Color); err != nil {
-			log.Printf("[DB] UpsertPlayer error: %v\n", err)
-		}
-	}
-
-	data := room.Game.Get(id)
-
-	switch data.Scene {
+	// Broadcast immediately — before any DB I/O so existing players see the
+	// update with zero added latency.
+	switch room.Game.Scene() {
 	case gamedata.SceneLobby:
 		var buf bytes.Buffer
-		if err := s.Tmpl.ExecuteTemplate(&buf, "lobbyPlayer", data.Player); err != nil {
+		if err := s.Tmpl.ExecuteTemplate(&buf, "lobbyPlayer", player); err != nil {
 			log.Println(err)
 		}
 		room.Broadcaster.BroadcastOOB("newPlayer", buf.String())
 	default:
+		count := room.Game.Players.Count()
+		topN := 5
+		if count >= 10 {
+			topN = 3
+		}
 		var buf bytes.Buffer
-		if err := s.Tmpl.ExecuteTemplate(&buf, "scoreboard", room.Game.Players.GetTopPlayers(5)); err != nil {
+		if err := s.Tmpl.ExecuteTemplate(&buf, "scoreboard", room.Game.Players.GetTopPlayers(topN)); err != nil {
 			log.Println(err)
 		}
 		room.Broadcaster.BroadcastOOB("scoreboard", buf.String())
+	}
+
+	// DB write is fire-and-forget — never block the hot path.
+	if s.DB != nil {
+		go func() {
+			if err := s.DB.UpsertPlayer(id, name, player.Color); err != nil {
+				log.Printf("[DB] UpsertPlayer error: %v\n", err)
+			}
+		}()
 	}
 
 	http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
@@ -428,9 +436,13 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 		}
 	}
 
-	targetOOB := fmt.Sprintf(`<div id="target_%d" hx-swap-oob="delete"></div>`, targetID)
-	playerOOB := fmt.Sprintf(`<div id="player_score_%s" hx-swap-oob="innerHTML">%d</div>`, player.ID, player.Score)
-	room.Broadcaster.BroadcastOOB("swap", targetOOB+playerOOB)
+	rank := room.Game.Players.GetPlayerRank(playerID)
+
+	targetOOB  := fmt.Sprintf(`<div id="target_%d" hx-swap-oob="delete"></div>`, targetID)
+	scoreOOB   := fmt.Sprintf(`<div id="player_score_%s" hx-swap-oob="innerHTML">%d</div>`, player.ID, player.Score)
+	myScoreOOB := fmt.Sprintf(`<span id="my_rank_score_%s" hx-swap-oob="innerHTML">%d</span>`, player.ID, player.Score)
+	myPosOOB   := fmt.Sprintf(`<span id="my_rank_pos_%s" hx-swap-oob="innerHTML">#%d</span>`, player.ID, rank)
+	room.Broadcaster.BroadcastOOB("swap", targetOOB+scoreOOB+myScoreOOB+myPosOOB)
 
 	return true, targetX, targetY
 }
@@ -669,9 +681,14 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	msgChan := room.Broadcaster.Subscribe()
 	defer room.Broadcaster.Unsubscribe(msgChan)
+
+	// Flush headers immediately so the browser's EventSource fires onopen
+	// right away and HTMX registers all sse-swap listeners before any events arrive.
+	flusher.Flush()
 
 	for {
 		select {

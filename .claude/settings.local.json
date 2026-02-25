@@ -84,7 +84,8 @@
       "Bash(claude plugin install frontend-design 2>&1)",
       "Bash(claude plugin list; echo \"exit: $?\")",
       "Bash(gh api:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(jobs -l 2>&1; ps aux | grep \"bot.py\\\\|swarm.py\" | grep -v grep | head -20)"
     ]
   }
 }

@@ -1,16 +1,35 @@
 {{define "recap"}}
 <div id="recap" class="recap-panel">
     <h1>Game Over!</h1>
-    <div class="recap-ranking">
+
+    <div class="recap-podium">
         {{range $i, $p := .}}
-        <div class="recap-row">
-            <div class="recap-row__rank">{{inc $i}}</div>
-            <div class="recap-row__dot" style="background-color:{{$p.Color}}"></div>
-            <div class="recap-row__name">{{$p.Name}}</div>
-            <div class="recap-row__score">{{$p.Score}} pts</div>
+        {{if lt $i 3}}
+        <div class="recap-podium__place recap-podium__place--{{inc $i}}" style="--chip-color: {{$p.Color}}">
+            <div class="recap-podium__medal">{{inc $i}}</div>
+            <div class="recap-podium__dot" style="background-color:{{$p.Color}}"></div>
+            <div class="recap-podium__name">{{$p.Name}}</div>
+            <div class="recap-podium__score">{{$p.Score}} pts</div>
         </div>
         {{end}}
+        {{end}}
     </div>
+
+    {{if gt (len .) 3}}
+    <div class="recap-rest">
+        {{range $i, $p := .}}
+        {{if ge $i 3}}
+        <div class="recap-rest__row">
+            <span class="recap-rest__rank">#{{inc $i}}</span>
+            <span class="recap-rest__dot" style="background-color:{{$p.Color}}"></span>
+            <span class="recap-rest__name">{{$p.Name}}</span>
+            <span class="recap-rest__score">{{$p.Score}}</span>
+        </div>
+        {{end}}
+        {{end}}
+    </div>
+    {{end}}
+
     <button type="submit" hx-post="/room/play-again" hx-swap="none">Play Again</button>
     <button type="button" hx-post="/room/leave" hx-swap="none" class="btn-ghost">Leave Room</button>
 </div>
