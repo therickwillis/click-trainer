@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"clicktrainer/internal/config"
 	"clicktrainer/internal/db"
 	"clicktrainer/internal/gamedata"
@@ -8,6 +9,7 @@ import (
 	"clicktrainer/internal/rooms"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -128,6 +130,8 @@ func metricsMiddleware(m *metrics.Metrics, next http.Handler) http.Handler {
 }
 
 // statusResponseWriter captures the HTTP status code written by a handler.
+// It forwards http.Flusher and http.Hijacker to the underlying ResponseWriter
+// so SSE and WebSocket handlers continue to work through the middleware.
 type statusResponseWriter struct {
 	http.ResponseWriter
 	status int
@@ -136,6 +140,24 @@ type statusResponseWriter struct {
 func (rw *statusResponseWriter) WriteHeader(code int) {
 	rw.status = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *statusResponseWriter) Flush() {
+	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (rw *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := rw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("underlying ResponseWriter does not support hijacking")
+	}
+	return h.Hijack()
+}
+
+func (rw *statusResponseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
 }
 
 // normalizePath replaces dynamic path segments with placeholders to prevent
