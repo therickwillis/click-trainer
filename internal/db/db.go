@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"log"
+	"log/slog"
 
 	_ "github.com/lib/pq"
 )
@@ -24,7 +24,7 @@ func Connect(dsn string) (*DB, error) {
 	if err := conn.Ping(); err != nil {
 		return nil, fmt.Errorf("pinging database: %w", err)
 	}
-	log.Println("[DB] Connected to PostgreSQL")
+	slog.Info("connected to PostgreSQL", "component", "db")
 	return &DB{conn: conn}, nil
 }
 
@@ -62,7 +62,7 @@ func (d *DB) Migrate() error {
 		if _, err := d.conn.Exec(string(content)); err != nil {
 			return fmt.Errorf("executing migration %s: %w", entry.Name(), err)
 		}
-		log.Printf("[DB] Applied migration: %s\n", entry.Name())
+		slog.Info("applied migration", "component", "db", "migration", entry.Name())
 	}
 	return nil
 }

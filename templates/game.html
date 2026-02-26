@@ -39,6 +39,7 @@
     </script>
 </head>
 
+<script>window.ROOM_CODE = "{{.RoomCode}}";</script>
 <body hx-ext="sse" sse-connect="/room/events" data-scene="{{.Scene}}">
     <div class="scene-bg"></div>
 
@@ -161,8 +162,13 @@
             ws.onopen = function() {
                 connected = true;
                 setupCursorTracking();
+                if (window.Telemetry) window.Telemetry.push({type: 'ws_connect'});
             };
-            ws.onclose = function() { ws = null; connected = false; };
+            ws.onclose = function() {
+                var wasConnected = connected;
+                ws = null; connected = false;
+                if (window.Telemetry) window.Telemetry.push({type: wasConnected ? 'ws_disconnect' : 'ws_reconnect'});
+            };
             ws.onerror = function() { ws = null; connected = false; };
             ws.onmessage = function(e) {
                 var msg;
@@ -408,7 +414,13 @@
         var muted = localStorage.getItem('clicktrainer_muted') === 'true';
 
         function getCtx() {
-            if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (!ctx) {
+                try {
+                    ctx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch(e) {
+                    if (window.Telemetry) window.Telemetry.push({type: 'audio_error', message: String(e)});
+                }
+            }
             return ctx;
         }
 
@@ -507,6 +519,123 @@
     }
 
     updateMuteIcon();
+
+    // ===== Telemetry =====
+    (function() {
+        var queue = [];
+        var sessionId = (Math.random().toString(36).slice(2));
+        var playerId = (function() {
+            try {
+                var m = document.cookie.match(/player_id=([^;]+)/);
+                return m ? m[1] : '';
+            } catch(_) { return ''; }
+        })();
+
+        function push(ev) {
+            queue.push(ev);
+            if (queue.length >= 50) flush();
+        }
+
+        function flush() {
+            if (!queue.length) return;
+            var batch = queue.splice(0);
+            var body = JSON.stringify({
+                session_id: sessionId,
+                room_code: window.ROOM_CODE || '',
+                player_id: playerId,
+                events: batch
+            });
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon('/telemetry', new Blob([body], {type: 'application/json'}));
+            } else {
+                fetch('/telemetry', {method: 'POST', body: body, headers: {'Content-Type': 'application/json'}, keepalive: true});
+            }
+        }
+
+        // Periodic flush
+        setInterval(flush, 3000);
+        window.addEventListener('beforeunload', flush);
+
+        // JS errors
+        window.addEventListener('error', function(e) {
+            push({type: 'js_error', message: (e.message || '') + ' ' + (e.filename || '') + ':' + (e.lineno || 0)});
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            push({type: 'js_error', message: String(e.reason)});
+        });
+
+        // SSE lifecycle
+        document.body.addEventListener('htmx:sseOpen', function() { push({type: 'sse_connect'}); });
+        document.body.addEventListener('htmx:sseError', function() { push({type: 'sse_error'}); });
+
+        // Scene transitions
+        var lastScene = document.body.getAttribute('data-scene') || '';
+        var sceneStartTime = Date.now();
+        (new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                if (m.type === 'attributes' && m.attributeName === 'data-scene') {
+                    var newScene = document.body.getAttribute('data-scene') || '';
+                    var now = Date.now();
+                    push({type: 'scene_transition', from_scene: lastScene, to_scene: newScene, value: now - sceneStartTime});
+                    lastScene = newScene;
+                    sceneStartTime = now;
+                }
+            });
+        })).observe(document.body, {attributes: true, attributeFilter: ['data-scene']});
+
+        // Click latency: mousedown -> target element removal
+        document.addEventListener('mousedown', function(e) {
+            var circle = e.target.closest('circle[data-points]');
+            if (!circle) return;
+            var targetDiv = circle.closest('[data-target-id]');
+            if (!targetDiv) return;
+            var t0 = Date.now();
+            var obs = new MutationObserver(function(muts, o) {
+                muts.forEach(function(m) {
+                    m.removedNodes.forEach(function(n) {
+                        if (n === targetDiv || (n.contains && n.contains(targetDiv))) {
+                            push({type: 'click_latency', value: Date.now() - t0});
+                            o.disconnect();
+                        }
+                    });
+                });
+            });
+            if (targetDiv.parentNode) {
+                obs.observe(targetDiv.parentNode, {childList: true, subtree: false});
+                setTimeout(function() { obs.disconnect(); }, 2000);
+            }
+        });
+
+        // Web Vitals
+        try {
+            if (typeof PerformanceObserver !== 'undefined') {
+                // LCP
+                try {
+                    (new PerformanceObserver(function(list) {
+                        var entries = list.getEntries();
+                        if (entries.length) {
+                            push({type: 'web_vital_lcp', value: entries[entries.length-1].startTime});
+                        }
+                    })).observe({type: 'largest-contentful-paint', buffered: true});
+                } catch(_) {}
+                // CLS
+                try {
+                    var clsValue = 0;
+                    (new PerformanceObserver(function(list) {
+                        list.getEntries().forEach(function(e) {
+                            if (!e.hadRecentInput) clsValue += e.value;
+                        });
+                    })).observe({type: 'layout-shift', buffered: true});
+                    window.addEventListener('visibilitychange', function() {
+                        if (document.visibilityState === 'hidden') push({type: 'web_vital_cls', value: clsValue});
+                    });
+                } catch(_) {}
+            }
+        } catch(_) {}
+
+        // Expose push for GameWS hooks
+        window.Telemetry = {push: push};
+    })();
 
     // Sound triggers for countdown and scene changes
     (function() {

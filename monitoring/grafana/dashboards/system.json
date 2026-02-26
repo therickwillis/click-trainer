@@ -1,0 +1,158 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {"list": []},
+  "description": "Container resources and application logs",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 100,
+      "title": "Container Resources (cAdvisor)",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
+      "id": 1,
+      "options": {"tooltip": {"mode": "multi"}},
+      "title": "CPU Usage per Container",
+      "type": "timeseries",
+      "targets": [{"datasource": {"type": "prometheus"}, "expr": "sum by(name) (rate(container_cpu_usage_seconds_total{name=~\"clicktrainer.*\"}[1m]))", "legendFormat": "{{name}}"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "bytes"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
+      "id": 2,
+      "options": {"tooltip": {"mode": "multi"}},
+      "title": "Memory Usage per Container",
+      "type": "timeseries",
+      "targets": [{"datasource": {"type": "prometheus"}, "expr": "container_memory_usage_bytes{name=~\"clicktrainer.*\"}", "legendFormat": "{{name}}"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
+      "id": 3,
+      "options": {"tooltip": {"mode": "multi"}},
+      "title": "Network I/O per Container",
+      "type": "timeseries",
+      "targets": [
+        {"datasource": {"type": "prometheus"}, "expr": "sum by(name) (rate(container_network_receive_bytes_total{name=~\"clicktrainer.*\"}[1m]))", "legendFormat": "rx {{name}}"},
+        {"datasource": {"type": "prometheus"}, "expr": "sum by(name) (rate(container_network_transmit_bytes_total{name=~\"clicktrainer.*\"}[1m]))", "legendFormat": "tx {{name}}"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9},
+      "id": 4,
+      "options": {"tooltip": {"mode": "multi"}},
+      "title": "Disk I/O per Container",
+      "type": "timeseries",
+      "targets": [
+        {"datasource": {"type": "prometheus"}, "expr": "sum by(name) (rate(container_fs_reads_bytes_total{name=~\"clicktrainer.*\"}[1m]))", "legendFormat": "read {{name}}"},
+        {"datasource": {"type": "prometheus"}, "expr": "sum by(name) (rate(container_fs_writes_bytes_total{name=~\"clicktrainer.*\"}[1m]))", "legendFormat": "write {{name}}"}
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 17},
+      "id": 101,
+      "title": "Application Logs (Loki)",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 18},
+      "id": 10,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "title": "App Logs (all levels)",
+      "type": "logs",
+      "targets": [{"datasource": {"type": "loki"}, "expr": "{container=\"clicktrainer_app\"}", "legendFormat": ""}]
+    },
+    {
+      "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 28},
+      "id": 11,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "title": "Error Logs",
+      "type": "logs",
+      "targets": [{"datasource": {"type": "loki"}, "expr": "{container=\"clicktrainer_app\", level=\"ERROR\"}", "legendFormat": ""}]
+    },
+    {
+      "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
+      "id": 12,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "title": "DB Logs",
+      "type": "logs",
+      "targets": [{"datasource": {"type": "loki"}, "expr": "{container=\"clicktrainer_app\", component=\"db\"}", "legendFormat": ""}]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["clicktrainer", "system"],
+  "templating": {"list": [
+    {
+      "current": {},
+      "hide": 2,
+      "includeAll": false,
+      "name": "DS_PROMETHEUS",
+      "options": [],
+      "query": "prometheus",
+      "refresh": 1,
+      "type": "datasource"
+    },
+    {
+      "current": {},
+      "hide": 2,
+      "includeAll": false,
+      "name": "DS_LOKI",
+      "options": [],
+      "query": "loki",
+      "refresh": 1,
+      "type": "datasource"
+    }
+  ]},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "System",
+  "uid": "clicktrainer-system",
+  "version": 1
+}

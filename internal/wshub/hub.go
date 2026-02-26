@@ -3,7 +3,7 @@ package wshub
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 
 	"github.com/coder/websocket"
@@ -97,7 +97,7 @@ func (h *Hub) Unregister(playerID string) {
 func (h *Hub) BroadcastExcept(senderID string, msg ServerMessage) {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("[WSHub] Marshal error: %v\n", err)
+		slog.Error("marshal error", "component", "wshub", "error", err)
 		return
 	}
 

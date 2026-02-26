@@ -2,7 +2,7 @@ package server
 
 import (
 	"clicktrainer/internal/analytics"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -31,12 +31,12 @@ func (s *Server) handleAnalyticsDashboard(w http.ResponseWriter, r *http.Request
 	// Default leaderboard: score
 	leaderboard, err := q.GetLeaderboard("score", 10)
 	if err != nil {
-		log.Printf("[Analytics] leaderboard error: %v\n", err)
+		slog.Error("leaderboard query failed", "handler", "analytics_dashboard", "error", err)
 	}
 	data.Leaderboard = leaderboard
 
 	if err := s.Tmpl.ExecuteTemplate(w, "analytics-dashboard", data); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "analytics_dashboard", "error", err)
 		http.Error(w, "Error rendering analytics", http.StatusInternalServerError)
 	}
 }
@@ -55,13 +55,13 @@ func (s *Server) handleAnalyticsLeaderboard(w http.ResponseWriter, r *http.Reque
 
 	entries, err := q.GetLeaderboard(category, 10)
 	if err != nil {
-		log.Printf("[Analytics] leaderboard error: %v\n", err)
+		slog.Error("leaderboard query failed", "handler", "analytics_leaderboard", "category", category, "error", err)
 		http.Error(w, "Error loading leaderboard", http.StatusInternalServerError)
 		return
 	}
 
 	if err := s.Tmpl.ExecuteTemplate(w, "leaderboard-entries", entries); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "analytics_leaderboard", "error", err)
 	}
 }
 
@@ -82,13 +82,13 @@ func (s *Server) handleAnalyticsPlayer(w http.ResponseWriter, r *http.Request) {
 	q := analytics.NewQueries(s.DB)
 	stats, err := q.GetPlayerLifetimeStats(playerID)
 	if err != nil {
-		log.Printf("[Analytics] player stats error: %v\n", err)
+		slog.Error("player stats query failed", "handler", "analytics_player", "player_id", playerID, "error", err)
 		http.Error(w, "Player not found", http.StatusNotFound)
 		return
 	}
 
 	if err := s.Tmpl.ExecuteTemplate(w, "analytics-player", stats); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "analytics_player", "error", err)
 		http.Error(w, "Error rendering player stats", http.StatusInternalServerError)
 	}
 }
@@ -110,13 +110,13 @@ func (s *Server) handleAnalyticsGame(w http.ResponseWriter, r *http.Request) {
 	q := analytics.NewQueries(s.DB)
 	recap, err := q.GetGameRecap(gameID)
 	if err != nil {
-		log.Printf("[Analytics] game recap error: %v\n", err)
+		slog.Error("game recap query failed", "handler", "analytics_game", "game_id", gameID, "error", err)
 		http.Error(w, "Game not found", http.StatusNotFound)
 		return
 	}
 
 	if err := s.Tmpl.ExecuteTemplate(w, "analytics-game", recap); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "analytics_game", "error", err)
 		http.Error(w, "Error rendering game recap", http.StatusInternalServerError)
 	}
 }

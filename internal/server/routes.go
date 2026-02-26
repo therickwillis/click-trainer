@@ -4,12 +4,17 @@ import (
 	"clicktrainer/internal/config"
 	"clicktrainer/internal/db"
 	"clicktrainer/internal/gamedata"
+	"clicktrainer/internal/metrics"
 	"clicktrainer/internal/rooms"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 	"text/template"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func Run() error {
@@ -21,6 +26,8 @@ func Run() error {
 		CountdownSecs:  3,
 	}
 	roomStore := rooms.NewStore(gameCfg)
+
+	m := metrics.New()
 
 	funcMap := template.FuncMap{
 		"inc": func(i int) int { return i + 1 },
@@ -39,28 +46,44 @@ func Run() error {
 	))
 
 	srv := &Server{
-		Rooms: roomStore,
-		Tmpl:  tmpl,
+		Rooms:   roomStore,
+		Tmpl:    tmpl,
+		Metrics: m,
 	}
 
 	// Optional database connection
 	if appCfg.DatabaseURL != "" {
 		database, err := db.Connect(appCfg.DatabaseURL)
 		if err != nil {
-			log.Printf("[DB] Failed to connect: %v (running without database)\n", err)
+			slog.Error("failed to connect to database, running without", "error", err)
 		} else {
 			if err := database.Migrate(); err != nil {
-				log.Printf("[DB] Migration failed: %v\n", err)
+				slog.Error("database migration failed", "error", err)
 			}
 			srv.DB = database
 			srv.ClickBuffer = make(chan db.ClickEvent, 1000)
 			srv.FlushSignal = make(chan chan struct{})
-			go clickBatchWriter(database, srv.ClickBuffer, srv.FlushSignal)
-			log.Println("[DB] Database connected and migrations applied")
+			go clickBatchWriter(database, srv.ClickBuffer, srv.FlushSignal, m)
+			slog.Info("database connected and migrations applied", "component", "db")
 		}
 	} else {
-		log.Println("[DB] DATABASE_URL not set, running without database")
+		slog.Info("DATABASE_URL not set, running without database", "component", "db")
 	}
+
+	// Background goroutine: poll room/player counts for gauges every 15s
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			rooms := roomStore.List()
+			m.RoomsActive.Set(float64(len(rooms)))
+			total := 0
+			for _, room := range rooms {
+				total += room.Game.Players.Count()
+			}
+			m.PlayersActive.Set(float64(total))
+		}
+	}()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", srv.handleHome)
@@ -77,6 +100,8 @@ func Run() error {
 	mux.HandleFunc("GET /room/poll", srv.handlePoll)
 	mux.HandleFunc("POST /room/play-again", srv.handlePlayAgain)
 	mux.HandleFunc("/health", srv.handleHealth)
+	mux.HandleFunc("POST /telemetry", srv.handleTelemetry)
+	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/analytics", srv.handleAnalyticsDashboard)
 	mux.HandleFunc("/analytics/leaderboard", srv.handleAnalyticsLeaderboard)
 	mux.HandleFunc("/analytics/player/", srv.handleAnalyticsPlayer)
@@ -84,20 +109,84 @@ func Run() error {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	addr := "0.0.0.0:" + appCfg.Port
-	fmt.Printf("Server listening on http://localhost:%s\n", appCfg.Port)
-	return http.ListenAndServe(addr, mux)
+	slog.Info("server listening", "addr", fmt.Sprintf("http://localhost:%s", appCfg.Port))
+	return http.ListenAndServe(addr, metricsMiddleware(m, mux))
 }
 
-func clickBatchWriter(database *db.DB, buffer chan db.ClickEvent, flushSignal chan chan struct{}) {
+// metricsMiddleware wraps an http.Handler to record request count and duration.
+func metricsMiddleware(m *metrics.Metrics, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := normalizePath(r.URL.Path)
+		start := time.Now()
+		rw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rw, r)
+		duration := time.Since(start).Seconds()
+		statusStr := strconv.Itoa(rw.status)
+		m.HTTPRequestsTotal.WithLabelValues(r.Method, path, statusStr).Inc()
+		m.HTTPRequestDuration.WithLabelValues(r.Method, path).Observe(duration)
+	})
+}
+
+// statusResponseWriter captures the HTTP status code written by a handler.
+type statusResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rw *statusResponseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// normalizePath replaces dynamic path segments with placeholders to prevent
+// label cardinality explosion in Prometheus.
+func normalizePath(p string) string {
+	parts := strings.Split(p, "/")
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		// /room/target/{id}/{points}
+		if i >= 3 && len(parts) > 3 && parts[2] == "target" {
+			if i == 3 {
+				parts[i] = "{id}"
+			} else if i == 4 {
+				parts[i] = "{points}"
+			}
+			continue
+		}
+		// /analytics/player/{id} and /analytics/game/{id}
+		if i == 3 && len(parts) > 3 && (parts[2] == "player" || parts[2] == "game") {
+			parts[i] = "{id}"
+			continue
+		}
+		// /room/{code}
+		if i == 2 && len(parts) == 3 && parts[1] == "room" {
+			parts[i] = "{code}"
+			continue
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+func clickBatchWriter(database *db.DB, buffer chan db.ClickEvent, flushSignal chan chan struct{}, m *metrics.Metrics) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	batch := make([]db.ClickEvent, 0, 50)
 
 	writeBatch := func() {
+		if m != nil {
+			m.ClickBufferDepth.Set(float64(len(buffer)))
+		}
 		if len(batch) > 0 {
 			if err := database.BatchRecordClicks(batch); err != nil {
-				log.Printf("[DB] BatchRecordClicks error: %v\n", err)
+				slog.Error("BatchRecordClicks failed", "component", "batch_writer", "error", err)
+				if m != nil {
+					m.DBWriteErrorsTotal.WithLabelValues("batch_record_clicks").Inc()
+				}
+			} else if m != nil {
+				m.ClickBatchFlushesTotal.Inc()
 			}
 			batch = batch[:0]
 		}

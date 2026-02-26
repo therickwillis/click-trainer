@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: clicktrainer
+    orgId: 1
+    folder: Click Trainer
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

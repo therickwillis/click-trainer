@@ -5,27 +5,29 @@ import (
 	"clicktrainer/internal/analytics"
 	"clicktrainer/internal/db"
 	"clicktrainer/internal/gamedata"
+	"clicktrainer/internal/metrics"
 	"clicktrainer/internal/rooms"
 	"clicktrainer/internal/wshub"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 )
 
 type Server struct {
 	Rooms       *rooms.Store
 	Tmpl        *template.Template
-	DB          *db.DB              // nil if no database configured
-	ClickBuffer chan db.ClickEvent   // nil if no database configured
-	FlushSignal chan chan struct{}    // nil if no database configured
+	DB          *db.DB             // nil if no database configured
+	ClickBuffer chan db.ClickEvent  // nil if no database configured
+	FlushSignal chan chan struct{}   // nil if no database configured
+	Metrics     *metrics.Metrics
 }
 
 // getRoom resolves the current room from the room_code cookie.
@@ -43,17 +45,15 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		data["RejoinCode"] = room.Code
 	}
 	if err := s.Tmpl.ExecuteTemplate(w, "home", data); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "home", "error", err)
 		http.Error(w, "Error rendering home page", http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:CreateRoom] Request Received")
-
 	room, err := s.Rooms.Create("")
 	if err != nil {
-		log.Println(err)
+		slog.Error("failed to create room", "handler", "create_room", "error", err)
 		http.Error(w, "Failed to create room", http.StatusInternalServerError)
 		return
 	}
@@ -65,12 +65,14 @@ func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
-	fmt.Printf("[Handle:CreateRoom] Created room %s\n", room.Code)
+	slog.Info("room created", "handler", "create_room", "room_code", room.Code)
+	if s.Metrics != nil {
+		s.Metrics.RoomsCreatedTotal.Inc()
+	}
 	http.Redirect(w, r, "/room/"+room.Code, http.StatusSeeOther)
 }
 
 func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:JoinRoom] Request Received")
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form", http.StatusBadRequest)
@@ -82,7 +84,7 @@ func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request) {
 	if room == nil {
 		// Re-render home with error
 		if err := s.Tmpl.ExecuteTemplate(w, "home", map[string]string{"Error": "Room not found"}); err != nil {
-			log.Println(err)
+			slog.Error("template error", "handler", "join_room", "error", err)
 		}
 		return
 	}
@@ -104,7 +106,7 @@ func (s *Server) renderRoom(w http.ResponseWriter, r *http.Request, room *rooms.
 		data := room.Game.Get(idCookie.Value)
 		data.RoomCode = room.Code
 		if err := s.Tmpl.ExecuteTemplate(w, "game", data); err != nil {
-			log.Println(err)
+			slog.Error("template error", "handler", "render_room", "error", err)
 			http.Error(w, "Error rendering game view", http.StatusInternalServerError)
 		}
 		return
@@ -112,7 +114,7 @@ func (s *Server) renderRoom(w http.ResponseWriter, r *http.Request, room *rooms.
 
 	// No valid session in this room — show the join form.
 	if err := s.Tmpl.ExecuteTemplate(w, "join", map[string]string{"RoomCode": room.Code}); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "render_room", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -136,7 +138,6 @@ func (s *Server) handleRoomWithCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:Room] Request Received")
 	room := s.getRoom(r)
 	if room == nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -146,7 +147,6 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:Register] Request Received")
 	room := s.getRoom(r)
 	if room == nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -159,7 +159,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	id := uuid.New().String()
 	name := r.FormValue("name")
-	fmt.Println("Registering name:", name)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "player_id",
@@ -176,11 +175,16 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	// Broadcast immediately — before any DB I/O so existing players see the
 	// update with zero added latency.
+	slog.Info("player registered", "handler", "register", "room_code", room.Code, "player_id", id, "name", name)
+	if s.Metrics != nil {
+		s.Metrics.PlayersRegisteredTotal.Inc()
+	}
+
 	switch room.Game.Scene() {
 	case gamedata.SceneLobby:
 		var buf bytes.Buffer
 		if err := s.Tmpl.ExecuteTemplate(&buf, "lobbyPlayer", player); err != nil {
-			log.Println(err)
+			slog.Error("template error", "handler", "register", "error", err)
 		}
 		room.Broadcaster.BroadcastOOB("newPlayer", buf.String())
 	default:
@@ -191,7 +195,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		var buf bytes.Buffer
 		if err := s.Tmpl.ExecuteTemplate(&buf, "scoreboard", room.Game.Players.GetTopPlayers(topN)); err != nil {
-			log.Println(err)
+			slog.Error("template error", "handler", "register", "error", err)
 		}
 		room.Broadcaster.BroadcastOOB("scoreboard", buf.String())
 	}
@@ -200,7 +204,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if s.DB != nil {
 		go func() {
 			if err := s.DB.UpsertPlayer(id, name, player.Color); err != nil {
-				log.Printf("[DB] UpsertPlayer error: %v\n", err)
+				slog.Error("UpsertPlayer failed", "handler", "register", "player_id", id, "error", err)
+				if s.Metrics != nil {
+					s.Metrics.DBWriteErrorsTotal.WithLabelValues("upsert_player").Inc()
+				}
 			}
 		}()
 	}
@@ -209,7 +216,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:Ready] Request Received")
 	room := s.getRoom(r)
 	if room == nil {
 		http.Error(w, "Room not found", http.StatusBadRequest)
@@ -238,14 +244,14 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 			data := room.Game.Get(idCookie.Value)
 			var buf bytes.Buffer
 			if err := s.Tmpl.ExecuteTemplate(&buf, "gameContent", data); err != nil {
-				log.Println(err)
+				slog.Error("template error", "handler", "ready", "error", err)
 				http.Error(w, "Error executing game template", http.StatusInternalServerError)
 			}
 
 			countdownStart := room.Game.Config.CountdownSecs
 			var countdownBuf bytes.Buffer
 			if err := s.Tmpl.ExecuteTemplate(&countdownBuf, "lobbyCountdown", countdownStart); err != nil {
-				log.Println(err)
+				slog.Error("template error", "handler", "ready", "error", err)
 				http.Error(w, "Error executing lobbyCountdown template", http.StatusInternalServerError)
 			}
 			countdownOOB := fmt.Sprintf(`<div id="lobby" hx-swap-oob="afterend">%s</div>`, countdownBuf.String())
@@ -261,7 +267,10 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 				if s.DB != nil {
 					gameID, err := s.DB.CreateGame(room.Code, room.HostID, room.Game.Config.RoundDuration*1000)
 					if err != nil {
-						log.Printf("[DB] CreateGame error: %v\n", err)
+						slog.Error("CreateGame failed", "room_code", room.Code, "error", err)
+						if s.Metrics != nil {
+							s.Metrics.DBWriteErrorsTotal.WithLabelValues("create_game").Inc()
+						}
 					} else {
 						room.Game.SetCurrentGameID(gameID)
 					}
@@ -272,7 +281,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 				data := room.Game.Get(idCookie.Value)
 				var gameBuf bytes.Buffer
 				if err := s.Tmpl.ExecuteTemplate(&gameBuf, "gameContent", data); err != nil {
-					log.Println(err)
+					slog.Error("template error", "handler", "ready_goroutine", "error", err)
 					return
 				}
 				gameOOB := fmt.Sprintf(`<div id="scene" hx-swap-oob="innerHTML">%s</div>`, gameBuf.String())
@@ -291,7 +300,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	buttonOOB := fmt.Sprintf(`<button id="ready_button" hx-swap-oob="innerHTML">%s</button>`, buttonTxt)
 	inputOOB := fmt.Sprintf(`<input id="ready_input" type="hidden" name="ready" hx-swap-oob="outerHTML" value="%s"/>`, inputTxt)
 	if _, err := w.Write([]byte(buttonOOB + inputOOB)); err != nil {
-		log.Println(err)
+		slog.Error("write error", "handler", "ready", "error", err)
 	}
 }
 
@@ -307,6 +316,10 @@ func (s *Server) startRoundTimer(room *rooms.Room) {
 	}
 
 	rankings := room.Game.EndRound()
+	if s.Metrics != nil {
+		s.Metrics.GamesCompletedTotal.Inc()
+		s.Metrics.GameDurationSeconds.Observe(float64(room.Game.Config.RoundDuration))
+	}
 
 	// Flush pending clicks before persisting game results
 	s.flushClickBuffer()
@@ -316,11 +329,17 @@ func (s *Server) startRoundTimer(room *rooms.Room) {
 		gameID := room.Game.CurrentGameID()
 		if gameID != "" {
 			if err := s.DB.EndGame(gameID); err != nil {
-				log.Printf("[DB] EndGame error: %v\n", err)
+				slog.Error("EndGame failed", "game_id", gameID, "error", err)
+				if s.Metrics != nil {
+					s.Metrics.DBWriteErrorsTotal.WithLabelValues("end_game").Inc()
+				}
 			}
 			for i, p := range rankings {
 				if err := s.DB.AddGamePlayer(gameID, p.ID, p.Score, i+1); err != nil {
-					log.Printf("[DB] AddGamePlayer error: %v\n", err)
+					slog.Error("AddGamePlayer failed", "game_id", gameID, "player_id", p.ID, "error", err)
+					if s.Metrics != nil {
+						s.Metrics.DBWriteErrorsTotal.WithLabelValues("add_game_player").Inc()
+					}
 				}
 			}
 			// Award badges
@@ -328,14 +347,17 @@ func (s *Server) startRoundTimer(room *rooms.Room) {
 			for _, p := range rankings {
 				gameStats, err := q.GetPlayerGameStats(gameID, p.ID)
 				if err != nil {
-					log.Printf("[DB] GetPlayerGameStats error: %v\n", err)
+					slog.Error("GetPlayerGameStats failed", "game_id", gameID, "player_id", p.ID, "error", err)
 					continue
 				}
 				gameBadges := analytics.EvaluateGameBadges(*gameStats)
 				for _, b := range gameBadges {
 					gID := gameID
 					if err := s.DB.AwardBadge(p.ID, string(b.ID), &gID); err != nil {
-						log.Printf("[DB] AwardBadge error: %v\n", err)
+						slog.Error("AwardBadge failed", "player_id", p.ID, "error", err)
+						if s.Metrics != nil {
+							s.Metrics.DBWriteErrorsTotal.WithLabelValues("award_badge").Inc()
+						}
 					}
 				}
 				// Check lifetime badges
@@ -344,7 +366,10 @@ func (s *Server) startRoundTimer(room *rooms.Room) {
 					lifeBadges := analytics.EvaluateLifetimeBadges(*lifeStats)
 					for _, b := range lifeBadges {
 						if err := s.DB.AwardBadge(p.ID, string(b.ID), nil); err != nil {
-							log.Printf("[DB] AwardBadge error: %v\n", err)
+							slog.Error("AwardBadge failed", "player_id", p.ID, "error", err)
+							if s.Metrics != nil {
+								s.Metrics.DBWriteErrorsTotal.WithLabelValues("award_badge").Inc()
+							}
 						}
 					}
 				}
@@ -354,7 +379,7 @@ func (s *Server) startRoundTimer(room *rooms.Room) {
 
 	var buf bytes.Buffer
 	if err := s.Tmpl.ExecuteTemplate(&buf, "recap", rankings); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "startRoundTimer", "error", err)
 		return
 	}
 	recapOOB := fmt.Sprintf(`<div id="scene" hx-swap-oob="innerHTML">%s</div>`, buf.String())
@@ -374,7 +399,7 @@ func (s *Server) handlePoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Tmpl.ExecuteTemplate(w, "gameContent", room.Game.Get(idCookie.Value)); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "poll", "error", err)
 	}
 }
 
@@ -395,9 +420,12 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 	}
 	time.AfterFunc(500*time.Millisecond, func() {
 		newTarget := room.Game.Targets.Add()
+		if s.Metrics != nil {
+			s.Metrics.TargetsSpawnedTotal.Inc()
+		}
 		var buf bytes.Buffer
 		if err := s.Tmpl.ExecuteTemplate(&buf, "target", newTarget); err != nil {
-			log.Println(err)
+			slog.Error("template error", "handler", "processClick", "error", err)
 		}
 		room.Broadcaster.BroadcastOOB("newTarget", buf.String())
 	})
@@ -405,6 +433,15 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 	player := room.Game.Players.UpdateScore(playerID, points)
 	if player == nil {
 		return false, 0, 0
+	}
+
+	if s.Metrics != nil {
+		s.Metrics.TargetsKilledTotal.Inc()
+		s.Metrics.ClicksProcessedTotal.WithLabelValues(strconv.Itoa(points), "http").Inc()
+		if target != nil {
+			reactionMs := float64(clickedAt.Sub(target.SpawnedAt).Milliseconds())
+			s.Metrics.ReactionTimeMs.Observe(reactionMs)
+		}
 	}
 
 	var targetX, targetY int
@@ -431,7 +468,7 @@ func (s *Server) processClick(room *rooms.Room, playerID string, targetID int, p
 				ReactionMs: reactionMs,
 			}:
 			default:
-				log.Println("[DB] Click buffer full, dropping event")
+				slog.Warn("click buffer full, dropping event", "room_code", room.Code)
 			}
 		}
 	}
@@ -458,7 +495,6 @@ func (s *Server) flushClickBuffer() {
 }
 
 func (s *Server) handleTarget(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:Target] Request Received")
 	room := s.getRoom(r)
 	if room == nil {
 		http.Error(w, "Room not found", http.StatusBadRequest)
@@ -517,7 +553,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
-		log.Printf("[WS] Accept error: %v\n", err)
+		slog.Error("WebSocket accept failed", "room_code", room.Code, "error", err)
 		return
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
@@ -531,7 +567,15 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	room.Hub.Register(client)
-	defer room.Hub.Unregister(playerID)
+	if s.Metrics != nil {
+		s.Metrics.WSConnectionsActive.Inc()
+	}
+	defer func() {
+		room.Hub.Unregister(playerID)
+		if s.Metrics != nil {
+			s.Metrics.WSConnectionsActive.Dec()
+		}
+	}()
 
 	ctx := r.Context()
 	go client.WritePump(ctx)
@@ -544,13 +588,13 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				ctx.Err() != nil {
 				return
 			}
-			log.Printf("[WS] Read error: %v\n", err)
+			slog.Error("WebSocket read error", "room_code", room.Code, "player_id", playerID, "error", err)
 			return
 		}
 
 		var msg wshub.ClientMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
-			log.Printf("[WS] Invalid message: %v\n", err)
+			slog.Warn("invalid WebSocket message", "player_id", playerID, "error", err)
 			continue
 		}
 
@@ -629,7 +673,7 @@ func (s *Server) handleLeaveRoom(w http.ResponseWriter, r *http.Request) {
 			rankings := room.Game.Players.GetList()
 			var buf bytes.Buffer
 			if err := s.Tmpl.ExecuteTemplate(&buf, "recap", rankings); err != nil {
-				log.Println(err)
+				slog.Error("template error", "handler", "leave_room", "error", err)
 			}
 			recapOOB := fmt.Sprintf(`<div id="scene" hx-swap-oob="innerHTML">%s</div>`, buf.String())
 			room.Broadcaster.BroadcastOOB("swap", recapOOB)
@@ -640,7 +684,6 @@ func (s *Server) handleLeaveRoom(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePlayAgain(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[Handle:PlayAgain] Request Received")
 	room := s.getRoom(r)
 	if room == nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -659,7 +702,7 @@ func (s *Server) handlePlayAgain(w http.ResponseWriter, r *http.Request) {
 	data.RoomCode = room.Code
 	var buf bytes.Buffer
 	if err := s.Tmpl.ExecuteTemplate(&buf, "lobby", data); err != nil {
-		log.Println(err)
+		slog.Error("template error", "handler", "play_again", "error", err)
 	}
 	lobbyOOB := fmt.Sprintf(`<div id="scene" hx-swap-oob="innerHTML">%s</div>`, buf.String())
 	room.Broadcaster.BroadcastOOB("swap", lobbyOOB)
@@ -684,7 +727,15 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	msgChan := room.Broadcaster.Subscribe()
-	defer room.Broadcaster.Unsubscribe(msgChan)
+	if s.Metrics != nil {
+		s.Metrics.SSEConnectionsActive.Inc()
+	}
+	defer func() {
+		room.Broadcaster.Unsubscribe(msgChan)
+		if s.Metrics != nil {
+			s.Metrics.SSEConnectionsActive.Dec()
+		}
+	}()
 
 	// Flush headers immediately so the browser's EventSource fires onopen
 	// right away and HTMX registers all sse-swap listeners before any events arrive.
@@ -695,6 +746,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case msg := <-msgChan:
+			if s.Metrics != nil {
+				s.Metrics.SSEMessagesPublished.WithLabelValues(msg.Event).Inc()
+			}
 			fmt.Fprintf(w, "event: %s\n", msg.Event)
 			for _, line := range strings.Split(msg.Msg, "\n") {
 				fmt.Fprintf(w, "data: %s\n", line)
