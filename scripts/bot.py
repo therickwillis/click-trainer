@@ -61,6 +61,7 @@ class BotConfig:
     session: str = ""
     screenshots: bool = False
     screenshot_prefix: str = ""
+    min_players: int = 1
 
 
 # ---------------------------------------------------------------------------
@@ -511,6 +512,24 @@ class BotPlayer:
     # ------------------------------------------------------------------
 
     def lobby_ready(self):
+        # Wait until the minimum number of players are present in the lobby.
+        # Prevents single-player AllReady() from firing too early in multi-bot games.
+        if self.cfg.min_players > 1:
+            for _ in range(120):  # up to 60s
+                raw = self.pw.eval(
+                    "() => document.querySelectorAll('.lobby-player').length"
+                ).strip()
+                try:
+                    count = int(raw)
+                except (ValueError, TypeError):
+                    count = 0
+                if self.cfg.verbose:
+                    print(f"[lobby] {count}/{self.cfg.min_players} players present",
+                          file=sys.stderr)
+                if count >= self.cfg.min_players:
+                    break
+                time.sleep(0.5)
+
         # Screenshot the lobby before readying up
         self._take_phase_screenshots("lobby")
 
@@ -691,6 +710,8 @@ def parse_args() -> BotConfig:
     parser.add_argument("--accuracy", type=float, default=None)
     parser.add_argument("--max-cps", type=float, default=None)
     parser.add_argument("--rounds", type=int, default=1)
+    parser.add_argument("--min-players", type=int, default=1,
+                        help="Wait for at least N players in lobby before clicking ready")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--screenshots", action="store_true",
                         help="Capture desktop + portrait screenshots at key phases")
@@ -709,6 +730,7 @@ def parse_args() -> BotConfig:
         miss_rate=args.miss_rate if args.miss_rate is not None else preset["miss_rate"],
         max_cps=args.max_cps if args.max_cps is not None else preset["max_cps"],
         rounds=args.rounds,
+        min_players=args.min_players,
         verbose=args.verbose,
         screenshots=args.screenshots,
     )

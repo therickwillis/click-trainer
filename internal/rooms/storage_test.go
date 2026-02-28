@@ -78,8 +78,12 @@ func TestStore_Delete(t *testing.T) {
 
 func TestStore_List(t *testing.T) {
 	s := NewStore(testConfig())
-	s.Create("host-1")
-	s.Create("host-2")
+	if _, err := s.Create("host-1"); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := s.Create("host-2"); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
 
 	list := s.List()
 	if len(list) != 2 {
@@ -95,7 +99,7 @@ func TestStore_ConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			s.Create("host")
+			_, _ = s.Create("host")
 		}()
 	}
 	wg.Wait()

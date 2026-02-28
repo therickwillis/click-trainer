@@ -44,7 +44,7 @@ func (q *Queries) GetPlayerGameStats(gameID, playerID string) (*PlayerGameStats,
 
 	// Calculate CPS from game duration
 	var durationSecs float64
-	q.DB.QueryRow(`
+	_ = q.DB.QueryRow(`
 		SELECT EXTRACT(EPOCH FROM (ended_at - started_at))
 		FROM games WHERE id = $1 AND ended_at IS NOT NULL AND started_at IS NOT NULL
 	`, gameID).Scan(&durationSecs)

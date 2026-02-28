@@ -53,7 +53,8 @@ def random_suffix(n: int = 3) -> str:
 
 
 def build_cmd(server: str, room_code: str | None, name: str, skill: str,
-              rounds: int, verbose: bool, screenshots: bool = False,
+              rounds: int, verbose: bool, count: int = 1,
+              screenshots: bool = False,
               screenshot_prefix: str | None = None) -> list[str]:
     cmd = [
         sys.executable, BOT_SCRIPT,
@@ -61,6 +62,7 @@ def build_cmd(server: str, room_code: str | None, name: str, skill: str,
         "--name", name,
         "--skill", skill,
         "--rounds", str(rounds),
+        "--min-players", str(count),
     ]
     if room_code:
         cmd += ["--room-code", room_code]
@@ -225,7 +227,7 @@ def main():
         # Only bot 0 takes screenshots (it creates the room and sees all phases)
         take_shots = args.screenshots and i == 0
         cmd = build_cmd(args.server, args.room_code, name, skill, args.rounds,
-                        args.verbose, screenshots=take_shots,
+                        args.verbose, count=args.count, screenshots=take_shots,
                         screenshot_prefix=args.screenshot_prefix)
         t = threading.Thread(
             target=run_bot,

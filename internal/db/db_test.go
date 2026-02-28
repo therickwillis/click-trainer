@@ -20,11 +20,11 @@ func getTestDB(t *testing.T) *DB {
 		t.Fatalf("Migrate() error: %v", err)
 	}
 	t.Cleanup(func() {
-		// Clean up test data
-		database.conn.Exec("DELETE FROM click_events")
-		database.conn.Exec("DELETE FROM game_players")
-		database.conn.Exec("DELETE FROM games")
-		database.conn.Exec("DELETE FROM players")
+		// Clean up test data; errors here are intentionally ignored.
+		_, _ = database.conn.Exec("DELETE FROM click_events")
+		_, _ = database.conn.Exec("DELETE FROM game_players")
+		_, _ = database.conn.Exec("DELETE FROM games")
+		_, _ = database.conn.Exec("DELETE FROM players")
 		database.Close()
 	})
 	return database
@@ -97,7 +97,9 @@ func TestCreateGame(t *testing.T) {
 
 	// Create a host player first
 	hostID := "550e8400-e29b-41d4-a716-446655440001"
-	database.UpsertPlayer(hostID, "Host", "#aabbcc")
+	if err := database.UpsertPlayer(hostID, "Host", "#aabbcc"); err != nil {
+		t.Fatalf("UpsertPlayer: %v", err)
+	}
 
 	gameID, err := database.CreateGame("ABCD", hostID, 60000)
 	if err != nil {
@@ -112,7 +114,9 @@ func TestEndGame(t *testing.T) {
 	database := getTestDB(t)
 
 	hostID := "550e8400-e29b-41d4-a716-446655440002"
-	database.UpsertPlayer(hostID, "Host", "#aabbcc")
+	if err := database.UpsertPlayer(hostID, "Host", "#aabbcc"); err != nil {
+		t.Fatalf("UpsertPlayer: %v", err)
+	}
 
 	gameID, _ := database.CreateGame("EFGH", hostID, 60000)
 
@@ -123,7 +127,9 @@ func TestEndGame(t *testing.T) {
 
 	// Verify ended_at is set
 	var endedAt *time.Time
-	database.conn.QueryRow("SELECT ended_at FROM games WHERE id = $1", gameID).Scan(&endedAt)
+	if err := database.conn.QueryRow("SELECT ended_at FROM games WHERE id = $1", gameID).Scan(&endedAt); err != nil {
+		t.Fatalf("querying ended_at: %v", err)
+	}
 	if endedAt == nil {
 		t.Error("ended_at should be set after EndGame()")
 	}
@@ -134,8 +140,12 @@ func TestAddGamePlayer(t *testing.T) {
 
 	hostID := "550e8400-e29b-41d4-a716-446655440003"
 	playerID := "550e8400-e29b-41d4-a716-446655440004"
-	database.UpsertPlayer(hostID, "Host", "#aabbcc")
-	database.UpsertPlayer(playerID, "Player", "#ddeeff")
+	if err := database.UpsertPlayer(hostID, "Host", "#aabbcc"); err != nil {
+		t.Fatalf("UpsertPlayer host: %v", err)
+	}
+	if err := database.UpsertPlayer(playerID, "Player", "#ddeeff"); err != nil {
+		t.Fatalf("UpsertPlayer player: %v", err)
+	}
 
 	gameID, _ := database.CreateGame("IJKL", hostID, 60000)
 
@@ -155,7 +165,9 @@ func TestRecordClick(t *testing.T) {
 	database := getTestDB(t)
 
 	hostID := "550e8400-e29b-41d4-a716-446655440005"
-	database.UpsertPlayer(hostID, "Host", "#aabbcc")
+	if err := database.UpsertPlayer(hostID, "Host", "#aabbcc"); err != nil {
+		t.Fatalf("UpsertPlayer: %v", err)
+	}
 
 	gameID, _ := database.CreateGame("MNOP", hostID, 60000)
 
@@ -181,7 +193,9 @@ func TestBatchRecordClicks(t *testing.T) {
 	database := getTestDB(t)
 
 	hostID := "550e8400-e29b-41d4-a716-446655440006"
-	database.UpsertPlayer(hostID, "Host", "#aabbcc")
+	if err := database.UpsertPlayer(hostID, "Host", "#aabbcc"); err != nil {
+		t.Fatalf("UpsertPlayer: %v", err)
+	}
 
 	gameID, _ := database.CreateGame("QRST", hostID, 60000)
 
@@ -198,7 +212,9 @@ func TestBatchRecordClicks(t *testing.T) {
 	}
 
 	var count int
-	database.conn.QueryRow("SELECT COUNT(*) FROM click_events WHERE game_id = $1", gameID).Scan(&count)
+	if err := database.conn.QueryRow("SELECT COUNT(*) FROM click_events WHERE game_id = $1", gameID).Scan(&count); err != nil {
+		t.Fatalf("querying click count: %v", err)
+	}
 	if count != 3 {
 		t.Errorf("click count = %d, want 3", count)
 	}

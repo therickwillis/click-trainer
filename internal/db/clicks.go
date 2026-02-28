@@ -34,7 +34,7 @@ func (d *DB) BatchRecordClicks(events []ClickEvent) error {
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare(`
 		INSERT INTO click_events (game_id, player_id, target_id, points, target_size, target_x, target_y, spawned_at, clicked_at, reaction_ms)

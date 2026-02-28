@@ -87,7 +87,9 @@
       "Bash(python3:*)",
       "Bash(jobs -l 2>&1; ps aux | grep \"bot.py\\\\|swarm.py\" | grep -v grep | head -20)",
       "Bash(docker ps:*)",
-      "Bash(docker rm:*)"
+      "Bash(docker rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(go:*)"
     ]
   }
 }
