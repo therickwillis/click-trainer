@@ -41,7 +41,13 @@
 
 <script>window.ROOM_CODE = "{{.RoomCode}}";</script>
 <body hx-ext="sse" sse-connect="/room/events" data-scene="{{.Scene}}">
-    <div class="scene-bg"></div>
+    <div class="scene-bg">
+        <div class="bg-sky"></div>
+        <div class="bg-stars"></div>
+        <div class="bg-clouds-far"></div>
+        <div class="bg-clouds-near"></div>
+        <div class="bg-hills"></div>
+    </div>
 
     <div class="game-layout">
         <div class="game-scene" id="scene">

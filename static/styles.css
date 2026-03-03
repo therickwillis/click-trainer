@@ -2,16 +2,37 @@
 @layer reset, tokens, base, background, layout, components, utilities;
 
 /* @property must be at top level (outside layers) for transitions to work */
-@property --blob-a-color {
+@property --sky-top {
   syntax: "<color>";
-  inherits: true;
-  initial-value: #ff6b9d;
+  inherits: false;
+  initial-value: #030112;
 }
 
-@property --blob-b-color {
+@property --sky-mid {
   syntax: "<color>";
-  inherits: true;
-  initial-value: #f7c948;
+  inherits: false;
+  initial-value: #080520;
+}
+
+@property --sky-bottom {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #150a35;
+}
+
+/* Hills are native green (#2a8540). Only brightness + saturation are needed —
+   no hue-rotate, no sepia. Registered as <number> so scene transitions
+   interpolate the values smoothly via `transition: --hills-* 0.9s ease`. */
+@property --hills-brightness {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0.5;
+}
+
+@property --hills-saturation {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1.0;
 }
 
 /* ============================
@@ -82,8 +103,7 @@
   h1 {
     font-size: 3rem;
     font-weight: 900;
-    text-shadow: 0 0.3rem 0 rgba(0, 0, 0, 0.3);
-    -webkit-text-stroke: 0.1rem rgba(0, 0, 0, 0.3);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
     color: white;
     text-align: center;
   }
@@ -218,78 +238,146 @@
     position: fixed;
     inset: 0;
     z-index: 0;
-    background: var(--scene-base, #0a0a18);
     overflow: hidden;
-    transition: background 0.8s ease,
-                --blob-a-color 0.8s ease,
-                --blob-b-color 0.8s ease;
   }
 
-  .scene-bg::before,
-  .scene-bg::after {
-    content: '';
+  .bg-sky {
     position: absolute;
-    border-radius: 50%;
-    filter: blur(90px);
-    opacity: 0.55;
+    inset: 0;
+    --sky-top: #030112;
+    --sky-mid: #080520;
+    --sky-bottom: #150a35;
+    background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-mid) 50%, var(--sky-bottom) 100%);
+    transition: --sky-top 0.9s ease, --sky-mid 0.9s ease, --sky-bottom 0.9s ease;
   }
 
-  .scene-bg::before {
-    width: 60vmax;
-    height: 60vmax;
-    background: var(--blob-a-color);
-    top: -20%;
-    left: -20%;
-    animation: blobDrift 12s ease-in-out infinite alternate;
+  .bg-stars {
+    position: absolute;
+    inset: 0;
+    background-image: url('/static/stars.svg');
+    background-size: cover;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    animation: starsPan 120s linear infinite;
+    animation-play-state: paused;
   }
 
-  .scene-bg::after {
-    width: 50vmax;
-    height: 50vmax;
-    background: var(--blob-b-color);
-    bottom: -20%;
-    right: -20%;
-    animation: blobDrift 12s ease-in-out infinite alternate;
-    animation-delay: -6s;
+  .bg-clouds-far {
+    position: absolute;
+    inset: 0;
+    /* Tile is 623×450px. cloud-1.svg places clouds in top 37% of canvas
+       → they land in the top ~166px of screen (upper sky). */
+    background-image: url('/static/cloud-1.svg');
+    background-repeat: repeat-x;
+    background-size: 623px 450px;
+    background-position: 0px 0%;
+    opacity: 0;
+    transition: opacity 0.9s ease;
+    animation: cloudDriftFar 800s linear infinite;
+    animation-play-state: paused;
   }
 
-  @keyframes blobDrift {
-    0%   { transform: translate(0, 0) scale(1); }
-    33%  { transform: translate(5%, 3%) scale(1.05); }
-    66%  { transform: translate(-3%, 7%) scale(0.97); }
-    100% { transform: translate(4%, -4%) scale(1.03); }
+  .bg-clouds-near {
+    position: absolute;
+    inset: 0;
+    /* Tile is 581×420px. cloud-2.svg places clouds in the 30–66% band of its
+       canvas → they land at ~127–277px from top (mid-sky, visibly lower and
+       faster than far layer). */
+    background-image: url('/static/cloud-2.svg');
+    background-repeat: repeat-x;
+    background-size: 581px 420px;
+    background-position: 0px 0%;
+    opacity: 0;
+    transition: opacity 0.9s ease;
+    animation: cloudDriftNear 255s linear infinite;
+    animation-play-state: paused;
   }
 
-  /* Scene palettes */
-  body[data-scene="home"] .scene-bg {
-    --scene-base: #1a0a1e;
-    --blob-a-color: #ff6b9d;
-    --blob-b-color: #f7c948;
+  .bg-hills {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 45%;
+    background-image: url('/static/hills.svg');
+    background-size: 100% 100%;
+    filter: brightness(var(--hills-brightness)) saturate(var(--hills-saturation));
+    /* Transition on the custom properties so the filter interpolates smoothly */
+    transition: --hills-brightness 0.9s ease, --hills-saturation 0.9s ease;
   }
 
-  body[data-scene="join"] .scene-bg {
-    --scene-base: #0e1520;
-    --blob-a-color: #f9a825;
-    --blob-b-color: #ff6b35;
+  @keyframes starsPan {
+    0%   { background-position: 0% 0%; }
+    50%  { background-position: 2% 1%; }
+    100% { background-position: 0% 0%; }
   }
 
-  body[data-scene="lobby"] .scene-bg {
-    --scene-base: #060f1e;
-    --blob-a-color: #00b4d8;
-    --blob-b-color: #7209b7;
+  @keyframes cloudDriftFar {
+    /* Moves exactly one tile width → seamless loop. 623px / 155s ≈ 4 px/s */
+    from { background-position-x: 0px; }
+    to   { background-position-x: 623px; }
   }
 
-  body[data-scene="combat"] .scene-bg {
-    --scene-base: #120008;
-    --blob-a-color: #e63946;
-    --blob-b-color: #f77f00;
+  @keyframes cloudDriftNear {
+    /* Moves exactly one tile width → seamless loop. 581px / 55s ≈ 10.6 px/s */
+    from { background-position-x: 0px; }
+    to   { background-position-x: 581px; }
   }
 
-  body[data-scene="recap"] .scene-bg {
-    --scene-base: #0d0920;
-    --blob-a-color: #7b2d8b;
-    --blob-b-color: #4361ee;
+  /* home: pre-dawn */
+  body[data-scene="home"] .bg-sky {
+    --sky-top: #0f0939;
+    --sky-mid: #18105b;
+    --sky-bottom: #000000;
   }
+  body[data-scene="home"] .bg-stars { opacity: 0.9; animation-play-state: running; }
+  body[data-scene="home"] .bg-clouds-far { opacity: 0.15; animation-play-state: running; }
+  body[data-scene="home"] .bg-clouds-near { opacity: 0.10; animation-play-state: running; }
+  body[data-scene="home"] .bg-hills { --hills-brightness: 0.30; --hills-saturation: 0.5; }  /* moonlit — dark, nearly grey-green */
+
+  /* join: sunrise */
+  body[data-scene="join"] .bg-sky {
+    --sky-top: #3d0b6b;
+    --sky-mid: #e8316e;
+    --sky-bottom: #ffb74d;
+  }
+  body[data-scene="join"] .bg-stars { opacity: 0.15; animation-play-state: running; }
+  body[data-scene="join"] .bg-clouds-far { opacity: 0.3; animation-play-state: running; }
+  body[data-scene="join"] .bg-clouds-near { opacity: 0.2; animation-play-state: running; }
+  body[data-scene="join"] .bg-hills { --hills-brightness: 0.55; --hills-saturation: 1.1; }  /* sunrise — green emerging from dawn shadow */
+
+  /* lobby: midday */
+  body[data-scene="lobby"] .bg-sky {
+    --sky-top: #0d47a1;
+    --sky-mid: #1976d2;
+    --sky-bottom: #90caf9;
+  }
+  body[data-scene="lobby"] .bg-stars { opacity: 0; animation-play-state: paused; }
+  body[data-scene="lobby"] .bg-clouds-far { opacity: 0.8; animation-play-state: running; }
+  body[data-scene="lobby"] .bg-clouds-near { opacity: 0.7; animation-play-state: running; }
+  body[data-scene="lobby"] .bg-hills { --hills-brightness: 0.90; --hills-saturation: 1.8; }  /* midday — bright, vivid, lush rolling green */
+
+  /* combat: sunset */
+  body[data-scene="combat"] .bg-sky {
+    --sky-top: #1a0000;
+    --sky-mid: #e55f42;
+    --sky-bottom: #f4be4b;
+  }
+  body[data-scene="combat"] .bg-stars { opacity: 0; animation-play-state: paused; }
+  body[data-scene="combat"] .bg-clouds-far { opacity: 0.5; animation-play-state: running; }
+  body[data-scene="combat"] .bg-clouds-near { opacity: 0.4; animation-play-state: running; }
+  body[data-scene="combat"] .bg-hills { --hills-brightness: 0.60; --hills-saturation: 1.2; }  /* sunset — warm afternoon light, still lush */
+
+  /* recap: night */
+  body[data-scene="recap"] .bg-sky {
+    --sky-top: #092452;
+    --sky-mid: #0f2d5a;
+    --sky-bottom: #000409;
+  }
+  body[data-scene="recap"] .bg-stars { opacity: 1.0; animation-play-state: running; }
+  body[data-scene="recap"] .bg-clouds-far { opacity: 0.22; animation-play-state: running; }
+  body[data-scene="recap"] .bg-clouds-near { opacity: 0.15; animation-play-state: running; }
+  body[data-scene="recap"] .bg-hills { --hills-brightness: 0.22; --hills-saturation: 0.4; }  /* deep night — dark silhouette, near-monochrome */
 }
 
 /* ============================
@@ -378,9 +466,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.5rem;
+    gap: 2rem;
     width: 100%;
-    max-width: 400px;
+    max-width: 480px;
   }
 
   /* Analytics page layout */
@@ -654,9 +742,9 @@
     background: var(--surface-2);
     backdrop-filter: blur(12px);
     border-radius: var(--r-lg);
-    padding: 1.5rem;
-    width: 400px;
-    max-width: calc(100vw - 2rem);
+    padding: 2rem;
+    width: 480px;
+    max-width: calc(100vw - 2.5rem);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -748,7 +836,7 @@
     background: var(--surface-1);
     backdrop-filter: blur(4px);
     border-radius: var(--r-md);
-    padding: 0.75rem 1rem;
+    padding: 0.9rem 1.1rem;
     color: white;
     font-weight: 700;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -797,9 +885,9 @@
     background: var(--surface-2);
     backdrop-filter: blur(12px);
     border-radius: var(--r-lg);
-    padding: 1.5rem;
-    width: 400px;
-    max-width: calc(100vw - 2rem);
+    padding: 2rem;
+    width: 480px;
+    max-width: calc(100vw - 2.5rem);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -821,7 +909,7 @@
     gap: 0.75rem;
     background: var(--surface-1);
     border-radius: var(--r-md);
-    padding: 0.75rem 1rem;
+    padding: 0.9rem 1.1rem;
     color: white;
     font-weight: 700;
     border: 1px solid rgba(255, 255, 255, 0.1);
