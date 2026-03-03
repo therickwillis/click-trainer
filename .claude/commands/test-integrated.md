@@ -81,7 +81,7 @@ Collect the JSON event stream from stdout. Each line is a JSON object.
 
 **3.7** Play again → lobby reset — **PASS** if a second `combat_start` event is emitted for round 2 (bot clicked Play Again, saw lobby with score reset, clicked Ready, and entered combat again). A second `recap` event for `"round": 2` confirms full cycle.
 
-Screenshots captured by the bot (desktop + portrait-sim pair per phase):
+Screenshots captured by the bot (desktop + mobile-portrait pair per phase):
 - `screenshots/sp1_lobby_desktop.png` — lobby before round 1 ready
 - `screenshots/sp1_combat_desktop.png` — combat start, round 1
 - `screenshots/sp1_combat_active_desktop.png` — mid-combat after first clicks
@@ -119,7 +119,7 @@ Read the swarm's coloured output. Each line is prefixed with the bot name.
 
 **4.6** Recap, sorted by score — **PASS** if the `--- Final Scores ---` block at swarm exit shows Bot scores in descending order (highest first).
 
-Screenshots captured by swarm (bot 0 only, desktop + portrait-sim):
+Screenshots captured by swarm (bot 0 only, desktop + mobile-portrait):
 - `screenshots/swarm2_lobby_desktop.png`
 - `screenshots/swarm2_combat_desktop.png`
 - `screenshots/swarm2_recap_desktop.png`
@@ -208,16 +208,16 @@ Edge cases:
 
 List all screenshots collected:
 
-Single-player (bot.py, desktop + portrait-sim pairs):
-- screenshots/sp1_lobby_desktop.png + sp1_lobby_portrait_sim.png (×2 — pre-round-1 and post-play-again)
-- screenshots/sp1_combat_desktop.png + sp1_combat_portrait_sim.png
-- screenshots/sp1_combat_active_desktop.png + sp1_combat_active_portrait_sim.png
-- screenshots/sp1_recap_desktop.png + sp1_recap_portrait_sim.png (×2 — round 1 and round 2)
+Single-player (bot.py, desktop + mobile-portrait pairs):
+- screenshots/sp1_lobby_desktop.png + sp1_lobby_mobile-portrait.png (×2 — pre-round-1 and post-play-again)
+- screenshots/sp1_combat_desktop.png + sp1_combat_mobile-portrait.png
+- screenshots/sp1_combat_active_desktop.png + sp1_combat_active_mobile-portrait.png
+- screenshots/sp1_recap_desktop.png + sp1_recap_mobile-portrait.png (×2 — round 1 and round 2)
 
-Two-player (swarm.py, bot 0 only, desktop + portrait-sim pairs):
-- screenshots/swarm2_lobby_desktop.png + swarm2_lobby_portrait_sim.png
-- screenshots/swarm2_combat_desktop.png + swarm2_combat_portrait_sim.png
-- screenshots/swarm2_recap_desktop.png + swarm2_recap_portrait_sim.png
+Two-player (swarm.py, bot 0 only, desktop + mobile-portrait pairs):
+- screenshots/swarm2_lobby_desktop.png + swarm2_lobby_mobile-portrait.png
+- screenshots/swarm2_combat_desktop.png + swarm2_combat_mobile-portrait.png
+- screenshots/swarm2_recap_desktop.png + swarm2_recap_mobile-portrait.png
 
 Edge cases (test_edge.py):
 - screenshots/edge_e1_invalid_code.png

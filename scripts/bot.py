@@ -15,9 +15,12 @@ Options:
   --max-cps F         Override max clicks per second
   --rounds N          Play N rounds then exit (default: 1)
   --verbose           Print debug info (snapshot dumps, timing)
-  --screenshots       Capture desktop + portrait screenshots at key phases
+  --screenshots       Capture viewport screenshots at key phases (see --viewports)
   --screenshot-prefix PREFIX
                       Filename prefix (default: derived from bot name + timestamp)
+  --viewports LIST    Comma-separated viewport presets. Options: desktop, tablet-landscape,
+                      tablet-portrait, mobile-portrait, mobile-landscape, or custom WxH.
+                      Default: desktop,mobile-portrait
 """
 
 import argparse
@@ -44,6 +47,16 @@ SKILL_PRESETS = {
     "elite":        dict(reaction_ms=100,  jitter=0.10, accuracy=0.9,  miss_rate=0.02, max_cps=5.0),
 }
 
+HUD_H = 46  # matches game.html inline script
+
+VIEWPORT_PRESETS: dict[str, tuple[int, int]] = {
+    "desktop":          (1280, 720),
+    "tablet-landscape": (1024, 768),
+    "tablet-portrait":  (768, 1024),
+    "mobile-portrait":  (390, 844),
+    "mobile-landscape": (844, 390),
+}
+
 
 @dataclass
 class BotConfig:
@@ -62,6 +75,7 @@ class BotConfig:
     screenshots: bool = False
     screenshot_prefix: str = ""
     min_players: int = 1
+    viewports: list[str] = field(default_factory=lambda: ["desktop", "mobile-portrait"])
 
 
 # ---------------------------------------------------------------------------
@@ -211,68 +225,93 @@ JS_GET_RECAP = (
     ")"
 )
 
-# Simulate a 393×852 portrait viewport on the existing 1280×720 browser window.
-# Directly applies mobile CSS rules (skipped because media query won't fire at 1280px),
-# forces the game rotation, and adds an orange frame label so the sim is obvious.
-JS_INJECT_PORTRAIT_SIM = (
-    "() => {"
-    # Portrait dimensions and derived scale (400-wide × 600-tall after -90° rotate)
-    "  var PW=393, PH=852, HUD_H=46;"
-    "  var scale = Math.min(PW*0.97/400, (PH-HUD_H)*0.97/600);"
-    "  var root = document.documentElement;"
-    "  root.style.setProperty('--game-scale', scale);"
-    "  root.style.setProperty('--game-rotate', 1);"
-    # CRITICAL: .game-scene has transform:scale(...) from CSS which (a) double-scales
-    # the game-area and (b) traps position:fixed children, preventing HUD from escaping
-    # to the viewport top. Override with 'none' to fix both issues.
-    "  var scene = document.querySelector('.game-scene');"
-    "  if (scene) scene.style.transform = 'none';"
-    # Apply mobile #game-area styles directly (media query doesn't fire at 1280px)
-    "  var ga = document.getElementById('game-area');"
-    "  if (ga) {"
-    "    ga.style.position='fixed';"
-    "    ga.style.inset='0';"
-    "    ga.style.margin='auto';"
-    "    ga.style.width='600px';"
-    "    ga.style.height='400px';"
-    "    ga.style.transformOrigin='center center';"
-    "    ga.style.transform='rotate(-90deg) scale('+scale+')';"
-    "  }"
-    # Apply mobile HUD styles
-    "  var hud = document.querySelector('.game-hud');"
-    "  if (hud) {"
-    "    hud.style.position='fixed';"
-    "    hud.style.top='0';"
-    "    hud.style.left='0';"
-    "    hud.style.right='0';"
-    "    hud.style.zIndex='100';"
-    "    hud.style.backdropFilter='blur(10px)';"
-    "    hud.style.background='rgba(0,0,0,0.6)';"
-    "    hud.style.padding='0.4rem 0.75rem';"
-    "    hud.style.width='auto';"
-    "  }"
-    # Hide chip names (mobile behavior)
-    "  document.querySelectorAll('.player-chip__name').forEach(function(el){"
-    "    el.setAttribute('data-portrait-hidden','1');"
-    "    el.style.display='none';"
-    "  });"
-    # Phone-frame overlay with label
-    "  if (!document.getElementById('__portrait_frame__')) {"
-    "    var frame = document.createElement('div');"
-    "    frame.id = '__portrait_frame__';"
-    "    frame.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;"
-    "      box-shadow:inset 0 0 0 5px rgba(255,120,0,0.85);border-radius:16px';"
-    "    var label = document.createElement('div');"
-    "    label.style.cssText = 'position:absolute;bottom:8px;right:10px;"
-    "      font:700 11px monospace;color:rgba(255,150,0,1);"
-    "      background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;"
-    "      letter-spacing:0.05em';"
-    "    label.textContent = 'portrait sim 393\u00d7852';"
-    "    frame.appendChild(label);"
-    "    document.body.appendChild(frame);"
-    "  }"
-    "}"
-)
+def js_inject_viewport(vw: int, vh: int):
+    """Return a JS IIFE that simulates vw×vh on the 1280×720 browser window.
+
+    Returns None for desktop (1280×720) — no injection needed.
+    For other sizes, injects CSS overrides to simulate the target viewport:
+    - Portrait (vh > vw): rotates -90deg and scales to fit
+    - Landscape non-desktop: scales to fit without rotation
+    Adds a colored frame overlay (orange for mobile vw<768, blue for tablet vw<1280).
+    """
+    if vw == 1280 and vh == 720:
+        return None
+
+    is_portrait = vh > vw
+    if is_portrait:
+        scale_expr = f"Math.min({vw}*0.97/400, ({vh}-{HUD_H})*0.97/600)"
+        rotate_val = 1
+        # Define transform JS as a Python variable to avoid quote conflicts
+        transform_js = "ga.style.transform='rotate(-90deg) scale('+scale+')';"
+    else:
+        scale_expr = f"Math.min({vw}*0.97/600, ({vh}-{HUD_H})*0.97/400)"
+        rotate_val = 0
+        transform_js = "ga.style.transform='scale('+scale+')';"
+
+    if vw < 768:
+        frame_color = "rgba(255,120,0,0.85)"
+        label_color = "rgba(255,150,0,1)"
+    else:
+        frame_color = "rgba(0,120,255,0.85)"
+        label_color = "rgba(80,160,255,1)"
+
+    return (
+        "() => {"
+        f"  var scale = {scale_expr};"
+        "  var root = document.documentElement;"
+        f"  root.style.setProperty('--game-scale', scale);"
+        f"  root.style.setProperty('--game-rotate', {rotate_val});"
+        # CRITICAL: .game-scene has transform:scale(...) from CSS which (a) double-scales
+        # the game-area and (b) traps position:fixed children, preventing HUD from escaping
+        # to the viewport top. Override with 'none' to fix both issues.
+        "  var scene = document.querySelector('.game-scene');"
+        "  if (scene) scene.style.transform = 'none';"
+        # Apply #game-area styles directly (media query doesn't fire at 1280px)
+        "  var ga = document.getElementById('game-area');"
+        "  if (ga) {"
+        "    ga.style.position='fixed';"
+        "    ga.style.inset='0';"
+        "    ga.style.margin='auto';"
+        "    ga.style.width='600px';"
+        "    ga.style.height='400px';"
+        "    ga.style.transformOrigin='center center';"
+        f"    {transform_js}"
+        "  }"
+        # Apply HUD styles
+        "  var hud = document.querySelector('.game-hud');"
+        "  if (hud) {"
+        "    hud.style.position='fixed';"
+        "    hud.style.top='0';"
+        "    hud.style.left='0';"
+        "    hud.style.right='0';"
+        "    hud.style.zIndex='100';"
+        "    hud.style.backdropFilter='blur(10px)';"
+        "    hud.style.background='rgba(0,0,0,0.6)';"
+        "    hud.style.padding='0.4rem 0.75rem';"
+        "    hud.style.width='auto';"
+        "  }"
+        # Hide chip names
+        "  document.querySelectorAll('.player-chip__name').forEach(function(el){"
+        "    el.setAttribute('data-viewport-hidden','1');"
+        "    el.style.display='none';"
+        "  });"
+        # Viewport frame overlay with label
+        "  if (!document.getElementById('__viewport_frame__')) {"
+        "    var frame = document.createElement('div');"
+        "    frame.id = '__viewport_frame__';"
+        f"    frame.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;"
+        f"      box-shadow:inset 0 0 0 5px {frame_color};border-radius:16px';"
+        "    var label = document.createElement('div');"
+        f"    label.style.cssText = 'position:absolute;bottom:8px;right:10px;"
+        f"      font:700 11px monospace;color:{label_color};"
+        "      background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;"
+        "      letter-spacing:0.05em';"
+        f"    label.textContent = '{vw}\u00d7{vh}';"
+        "    frame.appendChild(label);"
+        "    document.body.appendChild(frame);"
+        "  }"
+        "}"
+    )
 
 # Undo the portrait simulation and restore desktop layout.
 JS_RESTORE_DESKTOP = (
@@ -307,12 +346,14 @@ JS_RESTORE_DESKTOP = (
     "    hud.style.padding='';"
     "    hud.style.width='';"
     "  }"
-    "  document.querySelectorAll('[data-portrait-hidden]').forEach(function(el){"
+    "  document.querySelectorAll('[data-viewport-hidden],[data-portrait-hidden]').forEach(function(el){"
     "    el.style.display='';"
+    "    el.removeAttribute('data-viewport-hidden');"
     "    el.removeAttribute('data-portrait-hidden');"
     "  });"
-    "  var frame=document.getElementById('__portrait_frame__');"
-    "  if (frame) frame.remove();"
+    "  ['__viewport_frame__','__portrait_frame__'].forEach(function(id){"
+    "    var el=document.getElementById(id); if(el) el.remove();"
+    "  });"
     "}"
 )
 
@@ -352,11 +393,10 @@ class BotPlayer:
     # ------------------------------------------------------------------
 
     def _take_phase_screenshots(self, phase: str, wait_s: float = 0.0):
-        """Capture desktop + portrait-sim screenshots for a named game phase.
+        """Capture screenshots for each configured viewport at a named game phase.
 
         Files land in screenshots/ as:
-          {prefix}_{phase}_desktop.png
-          {prefix}_{phase}_portrait_sim.png
+          {prefix}_{phase}_{viewport_name}.png
         """
         if not self.cfg.screenshots:
             return
@@ -366,32 +406,33 @@ class BotPlayer:
 
         prefix = self.cfg.screenshot_prefix
 
-        # --- Desktop (1280×720 landscape) ---
-        desktop_name = f"{prefix}_{phase}_desktop.png"
-        desktop_path = self.pw.screenshot(desktop_name)
-        self._screenshots_taken.append(desktop_path)
-        emit({
-            "event": "screenshot",
-            "phase": phase,
-            "viewport": "desktop_1280x720",
-            "file": desktop_path,
-        })
-
-        # --- Portrait simulation (393×852 mobile) ---
-        self.pw.eval(JS_INJECT_PORTRAIT_SIM)
-        time.sleep(0.25)  # allow repaint after CSS injection
-        portrait_name = f"{prefix}_{phase}_portrait_sim.png"
-        portrait_path = self.pw.screenshot(portrait_name)
-        self._screenshots_taken.append(portrait_path)
-        emit({
-            "event": "screenshot",
-            "phase": phase,
-            "viewport": "portrait_sim_393x852",
-            "file": portrait_path,
-        })
-
-        # Restore desktop layout for continued interaction
-        self.pw.eval(JS_RESTORE_DESKTOP)
+        for vp_name in self.cfg.viewports:
+            dims = VIEWPORT_PRESETS.get(vp_name)
+            if dims is None:
+                # Support custom WxH format e.g. "1440x900"
+                try:
+                    w, h = (int(x) for x in vp_name.lower().split("x"))
+                    dims = (w, h)
+                except (ValueError, AttributeError):
+                    emit({"event": "screenshot_error", "viewport": vp_name, "reason": "unknown_preset"})
+                    continue
+            vw, vh = dims
+            js = js_inject_viewport(vw, vh)
+            if js is not None:
+                self.pw.eval(js)
+                time.sleep(0.25)  # allow repaint after CSS injection
+            path = self.pw.screenshot(f"{prefix}_{phase}_{vp_name}.png")
+            self._screenshots_taken.append(path)
+            emit({
+                "event": "screenshot",
+                "phase": phase,
+                "viewport": vp_name,
+                "dimensions": f"{vw}x{vh}",
+                "file": path,
+            })
+            if js is not None:
+                self.pw.eval(JS_RESTORE_DESKTOP)
+                time.sleep(0.1)
 
     def print_screenshot_summary(self):
         """Print a human-readable list of all screenshots taken."""
@@ -714,9 +755,13 @@ def parse_args() -> BotConfig:
                         help="Wait for at least N players in lobby before clicking ready")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--screenshots", action="store_true",
-                        help="Capture desktop + portrait screenshots at key phases")
+                        help="Capture viewport screenshots at key phases (see --viewports)")
     parser.add_argument("--screenshot-prefix", default=None,
                         help="Filename prefix for screenshots (default: botname_timestamp)")
+    parser.add_argument("--viewports", default=None,
+                        help="Comma-separated viewport presets. Options: desktop, tablet-landscape, "
+                             "tablet-portrait, mobile-portrait, mobile-landscape, or custom WxH. "
+                             "Default: desktop,mobile-portrait")
     args = parser.parse_args()
 
     preset = SKILL_PRESETS[args.skill]
@@ -733,6 +778,8 @@ def parse_args() -> BotConfig:
         min_players=args.min_players,
         verbose=args.verbose,
         screenshots=args.screenshots,
+        viewports=([v.strip() for v in args.viewports.split(",")]
+                   if args.viewports else ["desktop", "mobile-portrait"]),
     )
 
     suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
