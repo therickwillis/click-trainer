@@ -17,22 +17,24 @@
     <!-- Compute initial game scale before render to avoid layout flash -->
     <script>
     (function() {
-        var vw = window.innerWidth, vh = window.innerHeight;
+        var vw = window.innerWidth;
+        var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         var isMobile = vw <= 767;
         var isPortrait = vw < vh;
         var scale, rotate;
         if (!isMobile) {
-            // HUD (~46px) is inside scaled .game-scene; total native height ~446px
-            scale = Math.min(vw * 0.97 / 600, vh * 0.97 / 446);
+            // HUD (~52px) is inside scaled .game-scene; total native height ~452px
+            scale = Math.min(vw * 0.95 / 600, vh * 0.95 / 452);
             rotate = 0;
         } else if (isPortrait) {
             // Rotated game: 600x400 -> visually 400 wide x 600 tall
-            scale = Math.min(vw * 0.97 / 400, vh * 0.85 / 600);
+            scale = Math.min(vw * 0.95 / 400, vh * 0.85 / 600);
             rotate = 1;
         } else {
-            scale = Math.min(vw * 0.97 / 600, vh * 0.85 / 400);
+            scale = Math.min(vw * 0.95 / 600, vh * 0.85 / 400);
             rotate = 0;
         }
+        scale = Math.max(0.1, Math.min(scale, 8));
         document.documentElement.style.setProperty('--game-scale', scale);
         document.documentElement.style.setProperty('--game-rotate', rotate);
     })();
@@ -66,6 +68,9 @@
     <div id="game-content-conn" hx-trigger="sse:update" hx-get="/room/poll" hx-target="#game-content" hx-swap="innerHTML">
     </div>
 
+    <!-- Screen-space overlay for hit effects (not rotated with game-area) -->
+    <div id="game-overlay"></div>
+
     <!-- Mute button -->
     <button type="button" id="mute-btn" onclick="toggleMuteBtn()" class="mute-btn" title="Toggle sound">
         <span id="mute-icon">
@@ -80,27 +85,29 @@
     <script>
     // ===== Game scale — responsive scaling =====
     function updateGameScale() {
-        var vw = window.innerWidth, vh = window.innerHeight;
+        var vw = window.innerWidth;
+        var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         var isMobile = vw <= 767;
         var isPortrait = vw < vh;
         var hud = document.querySelector('.game-hud');
-        var hudH = (isMobile && hud) ? hud.getBoundingClientRect().height : 0;
         var scale, rotate;
 
         if (!isMobile) {
-            // Desktop: HUD included in scaled scene; native total ~446px
-            scale = Math.min(vw * 0.97 / 600, vh * 0.97 / 446);
+            var nativeHudH = hud ? (hud.scrollHeight || 52) : 52;
+            scale = Math.min(vw * 0.95 / 600, vh * 0.95 / (400 + nativeHudH));
             rotate = 0;
-        } else if (isPortrait) {
-            // Portrait: rotate -90deg, game fits as 400x600 in viewport
-            scale = Math.min(vw * 0.97 / 400, (vh - hudH) * 0.97 / 600);
-            rotate = 1;
         } else {
-            // Landscape mobile
-            scale = Math.min(vw * 0.97 / 600, (vh - hudH) * 0.97 / 400);
-            rotate = 0;
+            var hudH = hud ? hud.getBoundingClientRect().height : 0;
+            if (isPortrait) {
+                scale = Math.min(vw * 0.95 / 400, (vh - hudH) * 0.95 / 600);
+                rotate = 1;
+            } else {
+                scale = Math.min(vw * 0.95 / 600, (vh - hudH) * 0.95 / 400);
+                rotate = 0;
+            }
         }
 
+        scale = Math.max(0.1, Math.min(scale, 8));
         document.documentElement.style.setProperty('--game-scale', scale);
         document.documentElement.style.setProperty('--game-rotate', rotate);
     }
@@ -109,6 +116,9 @@
     window.addEventListener('orientationchange', function() {
         setTimeout(updateGameScale, 100);
     });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateGameScale);
+    }
 
     // ===== QR Code & Sharing =====
     function generateQR() {
@@ -329,15 +339,10 @@
         var gameArea = document.getElementById('game-area');
         if (!gameArea) return;
 
-        var rect = gameArea.getBoundingClientRect();
-        var scaleX = rect.width / gameArea.offsetWidth;
-        var scaleY = rect.height / gameArea.offsetHeight;
-        var x = (e.clientX - rect.left) / scaleX;
-        var y = (e.clientY - rect.top) / scaleY;
-
-        spawnPointsPopup(gameArea, x, y, points);
-        triggerScreenShake(gameArea);
-        spawnBurstParticles(gameArea, x, y);
+        var overlay = document.getElementById('game-overlay') || gameArea;
+        spawnPointsPopup(overlay, e.clientX, e.clientY, points);
+        triggerScreenShake(document.getElementById('targets') || gameArea);
+        spawnBurstParticles(overlay, e.clientX, e.clientY);
 
         if (window.SoundEngine) SoundEngine.playHit(points);
     });
@@ -365,14 +370,10 @@
         var gameArea = document.getElementById('game-area');
         if (!gameArea) return;
 
-        // Map viewport touch coords -> game element coords
-        var rect = gameArea.getBoundingClientRect();
-        var x = (touch.clientX - rect.left) * (gameArea.offsetWidth / rect.width);
-        var y = (touch.clientY - rect.top) * (gameArea.offsetHeight / rect.height);
-
-        spawnPointsPopup(gameArea, x, y, points);
-        triggerScreenShake(gameArea);
-        spawnBurstParticles(gameArea, x, y);
+        var overlay = document.getElementById('game-overlay') || gameArea;
+        spawnPointsPopup(overlay, touch.clientX, touch.clientY, points);
+        triggerScreenShake(document.getElementById('targets') || gameArea);
+        spawnBurstParticles(overlay, touch.clientX, touch.clientY);
         if (window.SoundEngine) SoundEngine.playHit(points);
     }, {passive: false});
 

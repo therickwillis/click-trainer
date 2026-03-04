@@ -47,7 +47,7 @@ SKILL_PRESETS = {
     "elite":        dict(reaction_ms=100,  jitter=0.10, accuracy=0.9,  miss_rate=0.02, max_cps=5.0),
 }
 
-HUD_H = 46  # matches game.html inline script
+HUD_H = 52  # matches game.html inline script (52px HUD estimate)
 
 VIEWPORT_PRESETS: dict[str, tuple[int, int]] = {
     "desktop":          (1280, 720),
@@ -239,14 +239,14 @@ def js_inject_viewport(vw: int, vh: int):
 
     is_portrait = vh > vw
     if is_portrait:
-        scale_expr = f"Math.min({vw}*0.97/400, ({vh}-{HUD_H})*0.97/600)"
+        scale_expr = f"Math.min({vw}*0.95/400, ({vh}-{HUD_H})*0.95/600)"
         rotate_val = 1
-        # Define transform JS as a Python variable to avoid quote conflicts
-        transform_js = "ga.style.transform='rotate(-90deg) scale('+scale+')';"
+        # translate(-50%,-50%) centers element when top/left are 50%; rotate+scale follow
+        transform_js = "ga.style.transform='translate(-50%,-50%) rotate(-90deg) scale('+scale+')';"
     else:
-        scale_expr = f"Math.min({vw}*0.97/600, ({vh}-{HUD_H})*0.97/400)"
+        scale_expr = f"Math.min({vw}*0.95/600, ({vh}-{HUD_H})*0.95/400)"
         rotate_val = 0
-        transform_js = "ga.style.transform='scale('+scale+')';"
+        transform_js = "ga.style.transform='translate(-50%,-50%) scale('+scale+')';"
 
     if vw < 768:
         frame_color = "rgba(255,120,0,0.85)"
@@ -266,12 +266,12 @@ def js_inject_viewport(vw: int, vh: int):
         # to the viewport top. Override with 'none' to fix both issues.
         "  var scene = document.querySelector('.game-scene');"
         "  if (scene) scene.style.transform = 'none';"
-        # Apply #game-area styles directly (media query doesn't fire at 1280px)
+        # Apply #game-area styles directly (container query doesn't fire at 1280px)
         "  var ga = document.getElementById('game-area');"
         "  if (ga) {"
         "    ga.style.position='fixed';"
-        "    ga.style.inset='0';"
-        "    ga.style.margin='auto';"
+        "    ga.style.top='50%';"
+        "    ga.style.left='50%';"
         "    ga.style.width='600px';"
         "    ga.style.height='400px';"
         "    ga.style.transformOrigin='center center';"
@@ -317,7 +317,7 @@ def js_inject_viewport(vw: int, vh: int):
 JS_RESTORE_DESKTOP = (
     "() => {"
     "  var vw=window.innerWidth, vh=window.innerHeight;"
-    "  var scale = Math.min(vw*0.97/600, vh*0.97/446);"
+    f"  var scale = Math.min(vw*0.95/600, vh*0.95/(400+{HUD_H}));"
     "  var root = document.documentElement;"
     "  root.style.setProperty('--game-scale', scale);"
     "  root.style.setProperty('--game-rotate', 0);"
@@ -327,8 +327,8 @@ JS_RESTORE_DESKTOP = (
     "  var ga = document.getElementById('game-area');"
     "  if (ga) {"
     "    ga.style.position='';"
-    "    ga.style.inset='';"
-    "    ga.style.margin='';"
+    "    ga.style.top='';"
+    "    ga.style.left='';"
     "    ga.style.width='';"
     "    ga.style.height='';"
     "    ga.style.transformOrigin='';"

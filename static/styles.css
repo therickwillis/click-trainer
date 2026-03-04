@@ -88,7 +88,7 @@
 @layer base {
   html,
   body {
-    height: 100%;
+    height: 100dvh;
     overflow: hidden;
     font-family: var(--font-main);
     color: white;
@@ -97,7 +97,7 @@
   body.page-scrollable {
     overflow: auto;
     height: auto;
-    min-height: 100%;
+    min-height: 100dvh;
   }
 
   h1 {
@@ -244,6 +244,7 @@
   .bg-sky {
     position: absolute;
     inset: 0;
+    z-index: 1;
     --sky-top: #030112;
     --sky-mid: #080520;
     --sky-bottom: #150a35;
@@ -254,6 +255,7 @@
   .bg-stars {
     position: absolute;
     inset: 0;
+    z-index: 2;
     background-image: url('/static/stars.svg');
     background-size: cover;
     opacity: 0;
@@ -265,6 +267,7 @@
   .bg-clouds-far {
     position: absolute;
     inset: 0;
+    z-index: 3;
     /* Tile is 623×450px. cloud-1.svg places clouds in top 37% of canvas
        → they land in the top ~166px of screen (upper sky). */
     background-image: url('/static/cloud-1.svg');
@@ -280,6 +283,7 @@
   .bg-clouds-near {
     position: absolute;
     inset: 0;
+    z-index: 4;
     /* Tile is 581×420px. cloud-2.svg places clouds in the 30–66% band of its
        canvas → they land at ~127–277px from top (mid-sky, visibly lower and
        faster than far layer). */
@@ -298,6 +302,7 @@
     bottom: 0;
     left: 0;
     right: 0;
+    z-index: 5;
     height: 45%;
     background-image: url('/static/hills.svg');
     background-size: 100% 100%;
@@ -386,6 +391,8 @@
 @layer layout {
   /* Fullscreen centered wrapper for game view */
   .game-layout {
+    container-type: size;
+    container-name: game-viewport;
     position: fixed;
     inset: 0;
     display: grid;
@@ -405,6 +412,8 @@
 
   /* HUD bar above game-area */
   .game-hud {
+    container-type: inline-size;
+    container-name: game-hud;
     width: var(--game-width);
     display: flex;
     flex-direction: row;
@@ -421,17 +430,11 @@
   }
 
   /* Mobile: break HUD and game-area out of flow */
-  @media (max-width: 767px) {
-    .game-scene {
-      transform: none;
-    }
+  @container game-viewport (width <= 767px) {
+    .game-scene { transform: none; }
 
     .game-hud {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       backdrop-filter: blur(10px);
       background: rgba(0, 0, 0, 0.6);
       padding: 0.4rem 0.75rem;
@@ -440,14 +443,31 @@
 
     #game-area {
       position: fixed;
-      inset: 0;
-      margin: auto;
-      width: var(--game-width);
-      height: var(--game-height);
-      touch-action: none;
-      transform-origin: center center;
-      transform: rotate(calc(var(--game-rotate, 0) * -90deg)) scale(var(--game-scale));
+      top: 50%;
+      left: 50%;
+      width: var(--game-width); height: var(--game-height);
+      touch-action: none; transform-origin: center center;
+      transform: translate(-50%, -50%) rotate(calc(var(--game-rotate, 0) * -90deg)) scale(var(--game-scale));
     }
+  }
+
+  /* Large screens — more breathing room */
+  @container game-viewport (width >= 1400px) {
+    .game-hud { gap: 0.75rem; }
+  }
+
+  /* Short viewports (landscape phone, small window) */
+  @container game-viewport (height <= 480px) {
+    .game-hud { padding: 0.25rem 0.75rem; }
+    .game-timer { font-size: 0.8rem; }
+  }
+
+  /* Screen-space overlay for hit effects — not rotated, always upright */
+  #game-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
   }
 
   /* Standalone page layout (home, join) */
@@ -526,20 +546,17 @@
     border-radius: var(--r-sm);
   }
 
-  @media (max-width: 767px) {
-    .scoreboard {
-      overflow: hidden;
-      justify-content: flex-start;
-    }
+  /* Very small HUD (e.g. 320px phone, tiny browser window) */
+  @container game-hud (width < 320px) {
+    .player-chip { padding: 0.15rem 0.3rem; gap: 0.15rem; font-size: 0.65rem; }
+    .player-chip__name, .player-chip__score { display: none; }
+    .game-timer { font-size: 0.7rem; padding: 0.2rem 0.4rem; }
+  }
 
-    .player-chip__name {
-      display: none;
-    }
-
-    .player-chip {
-      padding: 0.25rem 0.5rem;
-      gap: 0.25rem;
-    }
+  /* Small HUD (current mobile breakpoint) */
+  @container game-hud (width < 500px) {
+    .player-chip__name { display: none; }
+    .player-chip { padding: 0.25rem 0.5rem; gap: 0.25rem; }
   }
 
   /* Timer */
@@ -625,10 +642,10 @@
   }
 
   @keyframes shake {
-    0%, 100% { transform: translate(0, 0); }
-    25%       { transform: translate(-3px, 2px); }
-    50%       { transform: translate(3px, -2px); }
-    75%       { transform: translate(-2px, -1px); }
+    0%, 100% { translate: 0 0; }
+    25%       { translate: -3px 2px; }
+    50%       { translate: 3px -2px; }
+    75%       { translate: -2px -1px; }
   }
 
   .burst-particle {
